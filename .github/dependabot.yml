@@ -5,6 +5,9 @@ updates:
     schedule:
       interval: weekly
   - package-ecosystem: docker
-    directory: /docker
+    directories:
+      - /docker
+      - /docker/wpilib-systemcore
+      - /docker/wpilib-aarch64
     schedule:
       interval: weekly

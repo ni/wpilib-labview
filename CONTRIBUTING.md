@@ -23,8 +23,10 @@ See [GitHub's official documentation](https://help.github.com/articles/using-pul
 
 - You need LabVIEW 2025 or later (see `MinimumSupportedLVVersion` in each add-on's
   `lvaddoninfo.json`) and Python 3.
-- Fetch the native libraries for your platform:
-  `python scripts/fetch_natives.py --platform windowsx86-64` (see [README.md](README.md#native-libraries)).
+- Fetch the native libraries for your platform and build its shim libraries:
+  `python scripts/fetch_natives.py --platform windowsx86-64`, then
+  `scripts/build-shims.sh windowsx86-64` from Git Bash with Visual Studio 2022 or later (see
+  [README.md](README.md#native-libraries)).
 - Point LabVIEW at the repository's add-ons by adding its `lvaddons` folder to
   `LVAddons.AdditionalLocations` in LabVIEW's configuration file (`LabVIEW.ini` on Windows,
   `labview.conf` on Linux), then restart LabVIEW.
@@ -33,9 +35,11 @@ See [GitHub's official documentation](https://help.github.com/articles/using-pul
 
 # Testing
 
-- `scripts/build-in-docker.sh` builds the packages in the same container CI uses (it needs
-  Docker and a POSIX shell, such as Git Bash on Windows). It also runs `scripts/check_repo.py`,
-  which checks the repository rules CI enforces.
+- `scripts/build-in-docker.sh` builds the Linux shim libraries in WPILib's containers and the
+  packages in the same container CI uses (it needs Docker and a POSIX shell, such as Git Bash on
+  Windows). It also runs `scripts/check_repo.py`, which checks the repository rules CI enforces.
+- The shim libraries in `src/` have no automated tests; exercise changes to them on a Systemcore
+  robot, and check that each library exports what its `.exports` file lists.
 - Test changes to the APIs on a Systemcore robot with a project created from the
   FRC robot project template.
 

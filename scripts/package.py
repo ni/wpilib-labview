@@ -2,7 +2,8 @@
 """Build the add-on package for one platform: build/dist/wpilib-labview-<version>-<platform>.zip
 
 The zip holds lvaddons/ (the add-ons as tracked in git, with the platform's native libraries from
-natives.json in their resource folders), LICENSE, and THIRD-PARTY-NOTICES.md. Unzip it into a
+natives.json and the shim libraries from scripts/build-shims.sh in their resource folders),
+LICENSE, and THIRD-PARTY-NOTICES.md. Unzip it into a
 LabVIEW add-ons location (for example ~/natinst/lvaddons on Systemcore).
 
 Build packages with scripts/build-in-docker.sh, which runs this in the build container; Linux
@@ -46,10 +47,28 @@ def strip_debug_info(lvaddons):
             print(f"  stripped {lib.name}: {before // 1024} KB -> {lib.stat().st_size // 1024} KB")
 
 
+def add_shims(platform, lvaddons, require):
+    """Copy the shim libraries built by scripts/build-shims.sh for this platform into the add-ons."""
+    shims = ROOT / "build" / "shims" / f"shims-{platform}"
+    libs = sorted(p for p in shims.glob("*/1/resource/*") if p.is_file()) if shims.is_dir() else []
+    if not libs:
+        if require:
+            sys.exit(f"no shim libraries in {shims.relative_to(ROOT)}; build them with scripts/build-shims.sh")
+        print(f"  warning: no shim libraries for {platform}; NetworkTables and REVlib VIs won't load")
+        return
+    for lib in libs:
+        dest = lvaddons / lib.relative_to(shims)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(lib, dest)
+        print(f"  {lib.relative_to(shims).as_posix()}")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--platform", required=True)
     ap.add_argument("--version", required=True)
+    ap.add_argument("--require-shims", action="store_true",
+                    help="fail if the platform's shim libraries haven't been built")
     args = ap.parse_args()
 
     stage = ROOT / "build" / "stage" / args.platform
@@ -59,6 +78,7 @@ def main():
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / rel, dest)
     fetch_natives.fetch(fetch_natives.load_manifest(), args.platform, stage / "lvaddons")
+    add_shims(args.platform, stage / "lvaddons", args.require_shims)
     if args.platform.startswith("linux"):
         strip_debug_info(stage / "lvaddons")
     for name in ("LICENSE", "THIRD-PARTY-NOTICES.md"):

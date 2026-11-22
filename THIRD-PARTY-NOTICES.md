@@ -8,9 +8,9 @@ package carries the license files that ship with those libraries in
 
 ## WPILib
 
-`wpiHal`, `ntcoreffi`, `wpiutil`, and `wpimath`, from the WPILib Maven repository
-(<https://frcmaven.wpi.edu>). WPILib's own third-party notices are in `ThirdPartyNotices.txt`
-next to its license in each package.
+`wpiHal`, `ntcoreffi`, `wpiutil`, `wpimath`, and `MrcLib`, from the WPILib Maven repository
+(<https://frcmaven.wpi.edu>); the shim libraries are also built against their headers. WPILib's
+own third-party notices are in `ThirdPartyNotices.txt` next to its license in each package.
 
 ```text
 Copyright (c) 2009-2026 FIRST and other WPILib contributors
@@ -42,7 +42,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ## REV Robotics REVLib
 
 `REVLibDriver`, `BackendDriver`, and `REVLibWpi`, from the REV Robotics Maven repository
-(<https://maven.revrobotics.com>).
+(<https://maven.revrobotics.com>); `FRC_REVLibLV` is also built against REVLib's headers.
 
 ```text
 Copyright (c) 2018-2020 REV Robotics

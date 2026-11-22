@@ -11,7 +11,63 @@ permissions:
   contents: read
 
 jobs:
+  # The shim libraries (src/), built like WPILib builds its own native code: Linux in WPILib's
+  # containers (docker/wpilib-*), Windows and macOS on their runners
+  shims-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ linuxsystemcore, linuxx86-64, linuxarm64 ]
+    name: Shims - ${{ matrix.platform }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build shims
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: scripts/docker-shims.sh "$PLATFORM"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: shims-${{ matrix.platform }}
+          path: build/shims/shims-${{ matrix.platform }}/
+          if-no-files-found: error
+
+  shims-windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ windowsx86-64, windowsarm64 ]
+    name: Shims - ${{ matrix.platform }}
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build shims
+        shell: bash
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          PYTHON: python
+        run: scripts/build-shims.sh "$PLATFORM"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: shims-${{ matrix.platform }}
+          path: build/shims/shims-${{ matrix.platform }}/
+          if-no-files-found: error
+
+  shims-macos:
+    name: Shims - osxuniversal
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build shims
+        run: scripts/build-shims.sh osxuniversal
+      - uses: actions/upload-artifact@v7
+        with:
+          name: shims-osxuniversal
+          path: build/shims/shims-osxuniversal/
+          if-no-files-found: error
+
   build:
+    needs: [ shims-linux, shims-windows, shims-macos ]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -20,6 +76,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: shims-*
+          path: build/shims
 
       - name: Get version
         id: version
@@ -31,10 +92,12 @@ jobs:
           fi
 
       # Checks the repository and builds every platform's package in the build container
-      # (docker/Dockerfile), exactly as a local build does
+      # (docker/Dockerfile), exactly as a local build does, with the shims built above
       - name: Build packages
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          SHIMS_PREBUILT: 1
+          REQUIRE_SHIMS: 1
         run: scripts/build-in-docker.sh "$VERSION"
 
       # Sign every non-PR build so any build promoted to a release carries its signature. Pull

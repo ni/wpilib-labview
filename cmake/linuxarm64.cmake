@@ -1,0 +1,13 @@
+# Linux arm64: WPILib's Debian trixie arm64 cross-compiler (wpilib/aarch64-cross-debian image)
+set(CMAKE_SYSTEM_NAME Linux)
+set(CMAKE_SYSTEM_PROCESSOR aarch64)
+
+file(GLOB _gcc /usr/local/bin/aarch64-trixie*-linux-gnu-gcc)
+if(NOT _gcc)
+  message(FATAL_ERROR "No aarch64-trixie*-linux-gnu-gcc in /usr/local/bin; build in docker/wpilib-aarch64")
+endif()
+list(GET _gcc 0 _gcc)
+string(REGEX REPLACE "gcc$" "" _prefix "${_gcc}")
+set(CMAKE_C_COMPILER "${_prefix}gcc")
+set(CMAKE_CXX_COMPILER "${_prefix}g++")
+set(CMAKE_STRIP "${_prefix}strip")

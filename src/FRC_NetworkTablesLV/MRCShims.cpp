@@ -12,7 +12,7 @@
 #ifndef _WIN64
 #pragma pack(push, 1)
 #endif
-#elif defined(__linux)
+#elif defined(__linux__) || defined(__APPLE__)
 #define EXPORT_FUNC
 #else
 #error "Unsupported platform"

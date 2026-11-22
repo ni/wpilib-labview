@@ -3,7 +3,8 @@
 
 - No native binaries or per-machine LabVIEW files are tracked (natives come from natives.json).
 - Each add-on has a valid lvaddoninfo.json whose AddonName matches its folder.
-- natives.json pins a sha256 for every artifact and platform it lists.
+- natives.json pins a sha256 for every artifact zip it lists (platforms, link-only platforms, and
+  headers), so every download is verified before use.
 """
 
 import json
@@ -47,14 +48,17 @@ def main():
             errors.append(f"{label}: add-on {art['addon']!r} doesn't exist")
         if art["repository"] not in manifest["repositories"]:
             errors.append(f"{label}: unknown repository {art['repository']!r}")
-        for platform in art["platforms"]:
+        platforms = art["platforms"] + art.get("link_platforms", [])
+        for platform in platforms:
             if platform not in manifest["platforms"]:
                 errors.append(f"{label}: unknown platform {platform!r}")
-            if not re.fullmatch(r"[0-9a-f]{64}", art["sha256"].get(platform, "")):
-                errors.append(f"{label}: no sha256 for {platform}")
-        extra = set(art["sha256"]) - set(art["platforms"])
+        pinned = platforms + (["headers"] if art.get("headers") else [])
+        for classifier in pinned:
+            if not re.fullmatch(r"[0-9a-f]{64}", art["sha256"].get(classifier, "")):
+                errors.append(f"{label}: no sha256 for {classifier}")
+        extra = set(art["sha256"]) - set(pinned)
         if extra:
-            errors.append(f"{label}: sha256 for unlisted platform(s) {sorted(extra)}")
+            errors.append(f"{label}: sha256 for unlisted classifier(s) {sorted(extra)}")
 
     for e in errors:
         print(f"::error::{e}")

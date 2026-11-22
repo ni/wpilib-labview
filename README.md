@@ -32,13 +32,24 @@ gh attestation verify wpilib-labview-<version>-<platform>.zip --repo ni/wpilib-l
 
 ## Native libraries
 
-The add-ons call native libraries from WPILib and REV, which are not committed here.
-[`natives.json`](natives.json) pins each one by Maven coordinates, version, and sha256, and
-[`scripts/fetch_natives.py`](scripts/fetch_natives.py) downloads the right ones into each
-add-on's `resource` folder. To work from a clone:
+The add-ons call two kinds of native libraries, neither of which is committed here:
+
+- **WPILib and REV libraries** (`wpiHal`, `ntcoreffi`, `MrcLib`, `REVLibDriver`, and others).
+  [`natives.json`](natives.json) pins each one by Maven coordinates, version, and sha256, and
+  [`scripts/fetch_natives.py`](scripts/fetch_natives.py) downloads the right ones into each
+  add-on's `resource` folder.
+- **The shim libraries** `FRC_NetworkTablesLV` (wpilib) and `FRC_REVLibLV` (REVlib), which adapt
+  those libraries to LabVIEW. Their source is in [`src/`](src); see [Building](#building).
+
+Every download, including the headers and libraries the shims build against, is fetched over
+HTTPS with certificate verification and checked against its pinned sha256 before it's used; a
+mismatch deletes it and stops the build.
+
+To work from a clone, fetch a platform's libraries, then build its shims:
 
 ```bash
 python scripts/fetch_natives.py --platform windowsx86-64
+scripts/build-shims.sh windowsx86-64      # from Git Bash, with Visual Studio 2022 or later
 ```
 
 To move to new WPILib or REV versions, change the versions in `natives.json`, then run
@@ -46,17 +57,16 @@ To move to new WPILib or REV versions, change the versions in `natives.json`, th
 
 Notes:
 
-- On Systemcore, the robot image already provides `wpiutil`, so the `linuxsystemcore` package
-  doesn't include it.
+- On Systemcore, the robot image already provides `wpiutil` and `MrcLib`, so the
+  `linuxsystemcore` package doesn't include them. (`MrcLib`'s Systemcore build on Maven is only a
+  stub to link the shims against.)
 - REVlib's `REVLibWpi` uses the HAL in the wpilib add-on, so the robot program has to initialize
   the HAL (`HAL_Init.vi`) before it calls REVlib VIs.
-- REV doesn't publish Windows arm64 libraries, so the `windowsarm64` package has no REV libraries.
+- REV doesn't publish Windows arm64 libraries, so the `windowsarm64` package has no REV libraries,
+  and its `FRC_REVLibLV` returns "not implemented" for every call.
 
 ## Not done yet
 
-- **NI shim libraries.** NetworkTables and REVlib also call two NI-built libraries,
-  `FRC_NetworkTablesLV` and `FRC_REVLibLV`, which aren't in the packages yet. Until they are,
-  those VIs can't load their libraries.
 - **Examples** for Systemcore are still to be written.
 - **A Dashboard project template.**
 - **The Swerve subsystem template** is still being brought over.
@@ -72,16 +82,30 @@ the bootstrap key. See [SECURITY.md](SECURITY.md).
 
 ## Building
 
-Packages are built in a container ([`docker/Dockerfile`](docker/Dockerfile)), the same way in CI
-and locally. [`scripts/build-in-docker.sh`](scripts/build-in-docker.sh) builds the container,
-checks the repository rules, and builds the package for every platform into `build/dist/`:
+Builds run in containers wherever the platform allows, the same way in CI and locally, and the
+container images are pinned by digest:
+
+- The **shim libraries** for Linux build in WPILib's own build containers
+  ([`docker/wpilib-systemcore`](docker/wpilib-systemcore),
+  [`docker/wpilib-aarch64`](docker/wpilib-aarch64)) with
+  [`scripts/docker-shims.sh`](scripts/docker-shims.sh). Windows (Visual Studio 2022 or later) and
+  macOS (Xcode) shims build on those systems with [`scripts/build-shims.sh`](scripts/build-shims.sh).
+- The **packages** build in [`docker/Dockerfile`](docker/Dockerfile).
+
+[`scripts/build-in-docker.sh`](scripts/build-in-docker.sh) builds the Linux shims, checks the
+repository rules, and builds the package for every platform into `build/dist/`. Windows and macOS
+packages include their shims only if `scripts/build-shims.sh` has built them:
 
 ```bash
 scripts/build-in-docker.sh 0.0.0-dev
 ```
 
-[`.github/workflows/build.yml`](.github/workflows/build.yml) runs that script, signs the packages
-on every build except pull requests, and publishes them as a release for `v*` tags.
+[`.github/workflows/build.yml`](.github/workflows/build.yml) builds every platform's shims, then
+runs that script, signs the packages on every build except pull requests, and publishes them as
+a release for `v*` tags.
+
+The shims call LabVIEW's C API, declared by the LabVIEW 2026 Q3 `cintools` headers in
+[`src/cintools`](src/cintools).
 
 ## Contributing
 
@@ -89,5 +113,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-BSD-3-Clause; see [LICENSE](LICENSE). The native libraries in the packages come with their own
-licenses; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+BSD-3-Clause; see [LICENSE](LICENSE), except the LabVIEW `cintools` headers in
+[`src/cintools`](src/cintools), which keep NI's notice. The native libraries in the packages come
+with their own licenses; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

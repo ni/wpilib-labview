@@ -1,0 +1,13 @@
+# Systemcore: WPILib's Systemcore cross-compiler (wpilib/systemcore-cross-debian image)
+set(CMAKE_SYSTEM_NAME Linux)
+set(CMAKE_SYSTEM_PROCESSOR aarch64)
+
+file(GLOB _gcc /usr/local/bin/aarch64-systemcore*-linux-gnu-gcc)
+if(NOT _gcc)
+  message(FATAL_ERROR "No aarch64-systemcore*-linux-gnu-gcc in /usr/local/bin; build in docker/wpilib-systemcore")
+endif()
+list(GET _gcc 0 _gcc)
+string(REGEX REPLACE "gcc$" "" _prefix "${_gcc}")
+set(CMAKE_C_COMPILER "${_prefix}gcc")
+set(CMAKE_CXX_COMPILER "${_prefix}g++")
+set(CMAKE_STRIP "${_prefix}strip")
