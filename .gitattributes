@@ -15,6 +15,11 @@
 
 # Shell scripts run in Linux containers and on the CI runner
 *.sh text eol=lf
+# The shim sources use LF in every checkout, whatever core.autocrlf says
+src/** text eol=lf
+# LabVIEW's cintools headers, kept exactly as LabVIEW ships them (CRLF)
+src/cintools/*.h -text
+
 # Run by sh on Windows too (the deploy add-on runs it through Git for Windows), so keep LF
 lvaddons/systemcore-deploy/1/vi.lib/systemcore-deploy/systemcore-deploy text eol=lf
 *.cmd text eol=crlf
