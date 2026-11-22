@@ -21,13 +21,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-
-      - name: Check repository rules
-        run: python scripts/check_repo.py
-
       - name: Get version
         id: version
         run: |
@@ -37,14 +30,12 @@ jobs:
             echo "version=0.0.0-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           fi
 
+      # Checks the repository and builds every platform's package in the build container
+      # (docker/Dockerfile), exactly as a local build does
       - name: Build packages
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          platforms=$(python -c 'import json; print(" ".join(json.load(open("natives.json"))["platforms"]))')
-          for platform in $platforms; do
-            python scripts/package.py --platform "$platform" --version "$VERSION"
-          done
+        run: scripts/build-in-docker.sh "$VERSION"
 
       # Sign every non-PR build so any build promoted to a release carries its signature. Pull
       # requests from forks can't get the OIDC token signing needs.

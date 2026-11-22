@@ -72,14 +72,16 @@ the bootstrap key. See [SECURITY.md](SECURITY.md).
 
 ## Building
 
-[`.github/workflows/build.yml`](.github/workflows/build.yml) checks the repository, builds the
-package for every platform, signs the packages on every build except pull requests, and publishes
-them as a release for `v*` tags. To build a package locally:
+Packages are built in a container ([`docker/Dockerfile`](docker/Dockerfile)), the same way in CI
+and locally. [`scripts/build-in-docker.sh`](scripts/build-in-docker.sh) builds the container,
+checks the repository rules, and builds the package for every platform into `build/dist/`:
 
 ```bash
-python scripts/check_repo.py
-python scripts/package.py --platform linuxsystemcore --version 0.0.0-dev
+scripts/build-in-docker.sh 0.0.0-dev
 ```
+
+[`.github/workflows/build.yml`](.github/workflows/build.yml) runs that script, signs the packages
+on every build except pull requests, and publishes them as a release for `v*` tags.
 
 ## Contributing
 

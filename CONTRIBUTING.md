@@ -33,9 +33,9 @@ See [GitHub's official documentation](https://help.github.com/articles/using-pul
 
 # Testing
 
-- `python scripts/check_repo.py` checks the repository rules that CI enforces.
-- `python scripts/package.py --platform <platform> --version <version>` builds the package that
-  CI builds for each platform.
+- `scripts/build-in-docker.sh` builds the packages in the same container CI uses (it needs
+  Docker and a POSIX shell, such as Git Bash on Windows). It also runs `scripts/check_repo.py`,
+  which checks the repository rules CI enforces.
 - Test changes to the APIs on a Systemcore robot with a project created from the
   FRC robot project template.
 

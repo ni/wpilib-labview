@@ -5,7 +5,10 @@ The zip holds lvaddons/ (the add-ons as tracked in git, with the platform's nati
 natives.json in their resource folders), LICENSE, and THIRD-PARTY-NOTICES.md. Unzip it into a
 LabVIEW add-ons location (for example ~/natinst/lvaddons on Systemcore).
 
-    python scripts/package.py --platform linuxsystemcore --version 0.1.0
+Build packages with scripts/build-in-docker.sh, which runs this in the build container; Linux
+packages need its strip tools.
+
+    python3 scripts/package.py --platform linuxsystemcore --version 0.1.0
 """
 
 import argparse
@@ -25,18 +28,21 @@ def tracked_files(prefix):
     return [p for p in out.decode("utf-8").split("\0") if p]
 
 
+STRIP_BY_MACHINE = {0x3E: "strip", 0xB7: "aarch64-linux-gnu-strip"}  # ELF e_machine: x86-64, aarch64
+
+
 def strip_debug_info(lvaddons):
     """Remove debug info from Linux libraries; WPILib's desktop builds keep it (hundreds of MB)."""
-    strip = shutil.which("strip")
-    if not strip:
-        print("  warning: no strip; Linux libraries keep their debug info")
-        return
     for lib in sorted(lvaddons.glob("*/1/resource/*.so")):
+        machine = int.from_bytes(lib.read_bytes()[18:20], "little")
+        tool = STRIP_BY_MACHINE.get(machine)
+        strip = shutil.which(tool) if tool else None
+        if not strip:
+            sys.exit(f"no {tool or f'strip for ELF machine {machine:#x}'} to strip {lib.name}; "
+                     "build with scripts/build-in-docker.sh")
         before = lib.stat().st_size
-        result = subprocess.run([strip, "--strip-debug", str(lib)], capture_output=True, text=True)
-        if result.returncode:
-            print(f"  warning: couldn't strip {lib.name}: {result.stderr.strip()}")
-        elif lib.stat().st_size != before:
+        subprocess.run([strip, "--strip-debug", str(lib)], check=True)
+        if lib.stat().st_size != before:
             print(f"  stripped {lib.name}: {before // 1024} KB -> {lib.stat().st_size // 1024} KB")
 
 
