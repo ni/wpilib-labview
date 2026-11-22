@@ -33,3 +33,6 @@ RegisterInstance
 LV_InstallDSCallback
 LV_CodeStartCleanupProc
 LV_CodeStartMessage
+LV_AddPolledListenerSingle
+LV_GetTopicName
+LV_ProcessTopicNotifications
