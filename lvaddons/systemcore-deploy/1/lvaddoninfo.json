@@ -1,0 +1,5 @@
+{
+    "AddonName": "systemcore-deploy",
+    "ApiVersion": "v1",
+    "MinimumSupportedLVVersion": "25.0"
+}

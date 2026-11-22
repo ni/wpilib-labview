@@ -1,0 +1,9 @@
+*.vi binary
+*.vit binary
+*.ctl binary
+*.ctt binary
+*.xctl binary
+*.lvclass binary
+*.lvlib binary
+*.lvproj binary
+*.lvsc binary

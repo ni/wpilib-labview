@@ -1,0 +1,94 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write       # actions/attest: Sigstore signing certificate
+      attestations: write   # actions/attest: store the attestation
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Check repository rules
+        run: python scripts/check_repo.py
+
+      - name: Get version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build packages
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          platforms=$(python -c 'import json; print(" ".join(json.load(open("natives.json"))["platforms"]))')
+          for platform in $platforms; do
+            python scripts/package.py --platform "$platform" --version "$VERSION"
+          done
+
+      # Sign every non-PR build so any build promoted to a release carries its signature. Pull
+      # requests from forks can't get the OIDC token signing needs.
+      - name: Attest packages
+        id: attest
+        if: github.event_name != 'pull_request'
+        uses: actions/attest@v4
+        with:
+          subject-path: build/dist/*.zip
+
+      - name: Save the attestation next to each package
+        if: github.event_name != 'pull_request'
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          for zip in build/dist/*.zip; do
+            cp "$BUNDLE" "$zip.sigstore.json"
+          done
+          ls -l build/dist/
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wpilib-labview-${{ steps.version.outputs.version }}
+          path: build/dist/
+          retention-days: 90
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+          body: |
+            Unzip the package for your platform into a LabVIEW add-ons location; see the
+            [README](https://github.com/${{ github.repository }}#installing).
+
+            Each `.sigstore.json` file is the signed build provenance of the package next to it:
+            `gh attestation verify <package>.zip --repo ${{ github.repository }} --bundle <package>.zip.sigstore.json`

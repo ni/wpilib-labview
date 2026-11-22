@@ -1,0 +1,20 @@
+# LabVIEW files are binary; never convert their line endings
+*.vi binary
+*.vit binary
+*.vim binary
+*.ctl binary
+*.ctt binary
+*.xctl binary
+*.xnode binary
+*.lvclass binary
+*.lvlib binary
+*.lvproj binary
+*.lvsc binary
+*.mnu binary
+*.rch binary
+
+# Run by sh on Windows too (the deploy add-on runs it through Git for Windows), so keep LF
+lvaddons/systemcore-deploy/1/vi.lib/systemcore-deploy/systemcore-deploy text eol=lf
+*.cmd text eol=crlf
+# SSH keys: OpenSSH rejects a private key with CRLF line endings
+lvaddons/systemcore-deploy/1/vi.lib/systemcore-deploy/team-key/* text eol=lf

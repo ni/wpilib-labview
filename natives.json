@@ -1,0 +1,169 @@
+{
+  "repositories": {
+    "wpilib": "https://frcmaven.wpi.edu/artifactory/development",
+    "rev": "https://maven.revrobotics.com"
+  },
+  "platforms": [
+    "linuxsystemcore",
+    "windowsx86-64",
+    "windowsarm64",
+    "linuxx86-64",
+    "linuxarm64",
+    "osxuniversal"
+  ],
+  "artifacts": [
+    {
+      "addon": "wpilib",
+      "repository": "wpilib",
+      "group": "org.wpilib.hal",
+      "name": "hal-cpp",
+      "version": "2027.0.0-alpha-7",
+      "platforms": [
+        "linuxsystemcore",
+        "windowsx86-64",
+        "windowsarm64",
+        "linuxx86-64",
+        "linuxarm64",
+        "osxuniversal"
+      ],
+      "sha256": {
+        "linuxsystemcore": "a012d67cbc9d1590f965d93d0c17a19ae71edb698a285baa932fcf4267aac540",
+        "windowsx86-64": "bfe2f47361ae60ed48f81942539d9450c8ea7390b750f2b64b44950823317a59",
+        "windowsarm64": "6c06ca828d58491313035c70fe5cab88f613e62884de4c37e84eb22d4a9f051d",
+        "linuxx86-64": "bd46c0e2d359d62e4d39111d64c55a9926db2ae7f675f41eaeba6d11d7f54cef",
+        "linuxarm64": "391fe6e26ffe2f76c0accfa6d3f67edff1cfb7de7dd654287029185b55265bc1",
+        "osxuniversal": "9c93acf4da47d1af3fc6d689668d1805849af149dc43c683621dfba55eb40240"
+      }
+    },
+    {
+      "addon": "wpilib",
+      "repository": "wpilib",
+      "group": "org.wpilib.ntcoreffi",
+      "name": "ntcoreffi-cpp",
+      "version": "2027.0.0-alpha-7",
+      "platforms": [
+        "linuxsystemcore",
+        "windowsx86-64",
+        "windowsarm64",
+        "linuxx86-64",
+        "linuxarm64",
+        "osxuniversal"
+      ],
+      "sha256": {
+        "linuxsystemcore": "675db2fa2c7b3147ccdbb36541d70448a354e8173232b3966c4bc8c34461fde5",
+        "windowsx86-64": "6efc3c4bb14d67e88803d8cf3752729185498a066e33752f9f9adb9e0ab625b9",
+        "windowsarm64": "0a0bfeb7847dbdeb95a804d07c89e02a2f7bb34ab93cab5aaa680bdea4b15df1",
+        "linuxx86-64": "6bd18ffdb8d53e338a2a5b238e3ff792ddaac64b77d765c9a12ee98f6eae5d25",
+        "linuxarm64": "9c4105d4dd1fcbd9889c9824b59a40d807d21726be5e09799649ad4df6be5238",
+        "osxuniversal": "f854c3733b7628201c61531ad0afea2ad13e17f1cc1ef06f5989d5293a2c0b12"
+      }
+    },
+    {
+      "addon": "wpilib",
+      "repository": "wpilib",
+      "group": "org.wpilib.wpiutil",
+      "name": "wpiutil-cpp",
+      "version": "2027.0.0-alpha-7",
+      "comment": "Systemcore's image already provides wpiutil",
+      "platforms": [
+        "windowsx86-64",
+        "windowsarm64",
+        "linuxx86-64",
+        "linuxarm64",
+        "osxuniversal"
+      ],
+      "sha256": {
+        "windowsx86-64": "5ffc1037d7615d0d83ed44d2cbea67ba527b9d1642eb14b07f53a2a25e6554cd",
+        "windowsarm64": "7cd7e2d2636864c49aae772dd862159c99e4618035132dd6790c5dda8ce8d695",
+        "linuxx86-64": "706d08f22bd2ddcdae3c5d9b44292707e71753d2639a6f5336a992475a361b52",
+        "linuxarm64": "0316d6c3d6d89c8a0ccd6953e0ddce7342f0cfda23bbe6cb43a81d7d0b5ec9e7",
+        "osxuniversal": "6f786cf70b005389a8c5f171b6c499ec693f19cc6aababc8150c2312fcc9e715"
+      }
+    },
+    {
+      "addon": "REVlib",
+      "repository": "wpilib",
+      "group": "org.wpilib.wpimath",
+      "name": "wpimath-cpp",
+      "version": "2027.0.0-alpha-7",
+      "comment": "Needed by REVLibWpi",
+      "platforms": [
+        "linuxsystemcore",
+        "windowsx86-64",
+        "linuxx86-64",
+        "linuxarm64",
+        "osxuniversal"
+      ],
+      "sha256": {
+        "linuxsystemcore": "33cad6b4b57fcb5564a8b5a07f11c1fc445758ad08dd380d11b47fb0ffaec5a8",
+        "windowsx86-64": "5b7637826cd1d393b2e1b8c6dd68e561a6d33541ae82185f0487402a8664200b",
+        "linuxx86-64": "f7d6b170429be5251e9c144526e5829bcac17ad8d60513c6b85fcc1e5b174dd6",
+        "linuxarm64": "8699cd492adb99009a1747dd90415e522309a8e70b29285903eb13928bb42a00",
+        "osxuniversal": "e0c5ea0da6ba4899ad1ef5a0472cacab046e826d245eac10b442f76a6669d1d5"
+      }
+    },
+    {
+      "addon": "REVlib",
+      "repository": "rev",
+      "group": "com.revrobotics.frc",
+      "name": "REVLib-driver",
+      "version": "2027.0.0-alpha-8",
+      "platforms": [
+        "linuxsystemcore",
+        "windowsx86-64",
+        "linuxx86-64",
+        "linuxarm64",
+        "osxuniversal"
+      ],
+      "sha256": {
+        "linuxsystemcore": "bb002870244a7f93804ef6aac57a6489a23c3c13401ecf463cd474ff81dc7c27",
+        "windowsx86-64": "edc50d1a2d02afd1514374035de3c2b22c053574fbd4a93fa683f10a08c4b294",
+        "linuxx86-64": "8ed51042cf1cf5f765f7e3a81283be6f7ae1d5d5fadcc5f6878a0232f9a37be0",
+        "linuxarm64": "868ab15ed5ef22fbf4e2f0c010449d3792b700ac0937e1bc12530992dc859df7",
+        "osxuniversal": "ee2ce4656c701cac99c4228c0b3f24d9566b3cb3f2db3d5056f5ab65bd7783bc"
+      }
+    },
+    {
+      "addon": "REVlib",
+      "repository": "rev",
+      "group": "com.revrobotics.frc",
+      "name": "RevLibBackendDriver",
+      "version": "2027.0.0-alpha-8",
+      "platforms": [
+        "linuxsystemcore",
+        "windowsx86-64",
+        "linuxx86-64",
+        "linuxarm64",
+        "osxuniversal"
+      ],
+      "sha256": {
+        "linuxsystemcore": "7b3468cec37f8b9a85ffb136967859b5c2b09c965be7092c11dca0d6c2df7a73",
+        "windowsx86-64": "24621b923acf232c6119f3528641d6277197d4254c6f080fd45fb07f1406922a",
+        "linuxx86-64": "2842b183374846fa57d6837ecf5a6f278a7d65bead7ddc225f954e490099ea1b",
+        "linuxarm64": "68dc6f1c7bfd7dbaa57f61e47fd7fa58b896690dbc91d236e9a24c61616aba5f",
+        "osxuniversal": "f8f600650cffac6a9d35be915687d94f983ea85724ed3f303a9916087da65211"
+      }
+    },
+    {
+      "addon": "REVlib",
+      "repository": "rev",
+      "group": "com.revrobotics.frc",
+      "name": "RevLibWpiBackendDriver",
+      "version": "2027.0.0-alpha-8",
+      "platforms": [
+        "linuxsystemcore",
+        "windowsx86-64",
+        "linuxx86-64",
+        "linuxarm64",
+        "osxuniversal"
+      ],
+      "sha256": {
+        "linuxsystemcore": "6b3c08d00081d9b914ac6424f163bd85f7f004fb79a5553d0aaed760ebb3caef",
+        "windowsx86-64": "0c312abd47f230abefcc30f872bc08c392391d3108641398ad07eb3a1adb84d2",
+        "linuxx86-64": "e0076d994241b6f18c795aaa586e707c82eccfa3fa790645156c9061bb01d5ae",
+        "linuxarm64": "cc3a92f10c9e7137432ccccd5833aeb9436cfff83156f48aa652787a8c6a3d61",
+        "osxuniversal": "2607cd4b1cc5af480dde25cabdf18d9ee66926034a213affbf04e805f61a9e42"
+      }
+    }
+  ]
+}

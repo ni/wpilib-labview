@@ -1,0 +1,5 @@
+systemcore.local.ini
+*.lvlps
+*.aliases
+*.UserState/
+builds/

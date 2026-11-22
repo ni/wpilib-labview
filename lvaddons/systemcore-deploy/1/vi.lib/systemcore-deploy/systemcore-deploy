@@ -1,0 +1,779 @@
+#!/bin/sh
+# systemcore-deploy: deploy a LabVIEW project to a Systemcore robot with git (see docs/DEPLOYMENT.md).
+#
+# The LabVIEW deploy tool runs this (with Git for Windows' sh on a desktop, /bin/sh on a robot) and
+# parses its "SYSTEMCORE-TOOL: ..." lines and exit code; people can also run it from a terminal.
+#
+#   systemcore-deploy deploy   [options] [--addon DIR]...   commit, snapshot add-ons and deploy
+#   systemcore-deploy history  [options]                    print the robot's deploy history (JSON lines)
+#   systemcore-deploy redeploy [options] ID                 deploy an earlier deploy again
+#   systemcore-deploy checkout [options] ID                 make this project an earlier deploy's
+#                                                           version, to edit from there
+#   systemcore-deploy fetch    [options]                    get the robot's deploy into this project
+#   systemcore-deploy init     [options]                    set up git for a new project
+#   systemcore-deploy clone    [options] DIR                clone a robot's deploy into DIR (--target
+#                                                           is needed except on the robot itself)
+#   systemcore-deploy info     [options]                    show the project root, entry VI and target
+#   systemcore-deploy env                                   show whether this runs on a robot
+#
+# Options:
+#   --project DIR         project folder (or its .lvproj); default: the current directory
+#   --target HOST         robot; default: [robot] target in systemcore.local.ini, then systemcore.ini
+#   --key FILE            SSH private key; default: [auth] key in systemcore.local.ini,
+#                         $SYSTEMCORE_DEPLOY_KEY, the team key next to this script, then ssh's own
+#   --message TEXT        message for the commit of uncommitted changes (deploy)
+#   --addon DIR           an add-on directory the project uses (deploy; repeat for each)
+#   --resolve WHICH       when the robot runs a deploy this project doesn't contain (deploy, fetch):
+#                           robot  replace this project with the robot's deploy (a backup ref is kept)
+#                           mine   deploy this project in place of the robot's (deploy only)
+#                           merge  merge the robot's deploy into this project (then deploy it)
+#   --force               the same as --resolve mine
+#   --trust-new-hostkey   accept a changed robot SSH host key (after an OS reinstall)
+#
+# Exit codes: 0 OK, 1 error, 2 entry VI broken (rejected), 3 deployed with a warning,
+#             4 nothing to deploy, 10 a choice is needed (rerun with --resolve)
+set -u
+LC_ALL=C
+export LC_ALL
+
+PROG=systemcore-deploy
+DEPLOY_REF=refs/systemcore/deploy
+ADDONS_REF=refs/systemcore/addons
+LOG_REF=refs/systemcore/log
+HISTORY_REFS=refs/systemcore/history
+TRACK=refs/remotes/robot
+
+say() { printf '%s\n' "$*"; }
+tool() { printf 'SYSTEMCORE-TOOL: %s\n' "$*"; }
+fail() {
+    say "$PROG: error: $2"
+    tool "RESULT ERROR $1"
+    exit 1
+}
+usage() {
+    sed -n '2,/^set -u/p' "$0" | sed -e '/^set -u/d' -e 's/^# \{0,1\}//'
+    exit "${1:-0}"
+}
+
+# Paths from LabVIEW on Windows use backslashes
+normpath() { printf '%s' "$1" | tr '\\' '/'; }
+# Paths for LabVIEW: Git for Windows' sh uses /c/..., which LabVIEW doesn't understand
+native_path() {
+    if command -v cygpath > /dev/null 2>&1; then cygpath -w "$1"; else printf '%s\n' "$1"; fi
+}
+
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+
+# A robot has the systemcore-labview package: on the host, or under /host in its LabVIEW container
+on_robot() {
+    [ -x /opt/systemcore-labview/bin/lv-deploy ] || [ -x /host/opt/systemcore-labview/bin/lv-deploy ]
+}
+CMD=${1:-}
+[ $# -gt 0 ] && shift
+PROJECT=.
+TARGET=
+KEY=
+MESSAGE=
+RESOLVE=
+TRUST_HOSTKEY=
+ADDONS=
+ARG=
+while [ $# -gt 0 ]; do
+    case $1 in
+        --project | --target | --key | --message | --addon | --resolve)
+            [ $# -ge 2 ] || fail USAGE "$1 needs a value"
+            case $1 in
+                --project) PROJECT=$(normpath "$2") ;;
+                --target) TARGET=$2 ;;
+                --key) KEY=$(normpath "$2") ;;
+                --message) MESSAGE=$2 ;;
+                --addon) ADDONS="$ADDONS$(normpath "$2")
+" ;;
+                --resolve)
+                    case $2 in
+                        robot | mine | merge) RESOLVE=$2 ;;
+                        *) fail USAGE "--resolve takes robot, mine or merge" ;;
+                    esac
+                    ;;
+            esac
+            shift 2
+            ;;
+        --force) RESOLVE=mine; shift ;;
+        --trust-new-hostkey) TRUST_HOSTKEY=1; shift ;;
+        -h | --help) usage 0 ;;
+        -*) fail USAGE "unknown option $1" ;;
+        *)
+            [ -z "$ARG" ] || fail USAGE "unexpected argument $1"
+            ARG=$1
+            shift
+            ;;
+    esac
+done
+
+TMP=$(mktemp -d 2>/dev/null || mktemp -d -t systemcore-deploy) || fail TEMP "can't create a temporary directory"
+trap 'rm -rf "$TMP"' EXIT
+trap 'exit 1' INT TERM
+
+# --- configuration ---------------------------------------------------------------------------
+
+# ini_get FILE SECTION KEY: a value from an INI file (case-insensitive names, ; and # comments)
+ini_get() {
+    [ -f "$1" ] || return 0
+    awk -v sec="$2" -v key="$3" '
+        { sub(/\r$/, "") }
+        /^[ \t]*[;#]/ { next }
+        /^[ \t]*\[/ {
+            s = $0; gsub(/^[ \t]*\[|\][ \t]*$/, "", s)
+            insec = (tolower(s) == tolower(sec)); next
+        }
+        insec {
+            i = index($0, "="); if (!i) next
+            k = substr($0, 1, i - 1); v = substr($0, i + 1)
+            gsub(/^[ \t]+|[ \t]+$/, "", k)
+            if (tolower(k) != tolower(key)) next
+            sub(/[ \t]+[;#].*$/, "", v); gsub(/^[ \t]+|[ \t]+$/, "", v); gsub(/^"|"$/, "", v)
+            print v; exit
+        }' "$1"
+}
+
+# The project root: the folder with systemcore.ini, searching up from --project
+find_root() {
+    p=$PROJECT
+    case $p in *.lvproj) p=$(dirname "$p") ;; esac
+    [ -d "$p" ] || fail NO_PROJECT "project folder not found: $p"
+    start=$(cd "$p" && pwd)
+    ROOT=$start
+    while [ ! -f "$ROOT/systemcore.ini" ]; do
+        parent=$(dirname "$ROOT")
+        if [ "$parent" = "$ROOT" ]; then
+            ROOT=$start
+            break
+        fi
+        ROOT=$parent
+    done
+    cd "$ROOT" || fail NO_PROJECT "can't enter $ROOT"
+}
+
+require_repo() {
+    if ! git rev-parse --git-dir > /dev/null 2>&1; then
+        tool "NEEDS_INIT"
+        fail NOT_A_REPO "$ROOT isn't a git repository yet; run '$PROG init' first"
+    fi
+    [ -z "$(git rev-parse --show-prefix)" ] ||
+        fail SUBDIRECTORY "the project must be at the top of its git repository ($(git rev-parse --show-toplevel)), with systemcore.ini there"
+}
+
+load_target() {
+    TARGET=${TARGET:-$(ini_get systemcore.local.ini robot target)}
+    TARGET=${TARGET:-$(ini_get systemcore.ini robot target)}
+    [ -n "$TARGET" ] ||
+        fail NO_TARGET "no robot to deploy to: set [robot] target in systemcore.ini (or systemcore.local.ini), or pass --target"
+    setup_ssh
+}
+
+setup_ssh() {
+    HOST=${TARGET#*@}
+    # On a robot, deploys always go to the robot itself, through localhost: its IDE container has no
+    # mDNS resolver (robot.local doesn't resolve there), and deploying from one robot to another
+    # isn't supported
+    connect=$HOST
+    on_robot && connect=localhost
+    URL="lvdeploy@$connect:robot.git"
+    KEY=${KEY:-$(normpath "$(ini_get systemcore.local.ini auth key)")}
+    KEY=${KEY:-$(normpath "${SYSTEMCORE_DEPLOY_KEY:-}")}
+    ssh_cmd="ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new"
+    if [ -n "$KEY" ]; then
+        [ -f "$KEY" ] || fail KEY_NOT_FOUND "SSH key not found: $KEY"
+        # ssh refuses a private key that others can read; use a private copy
+        cp "$KEY" "$TMP/key" && chmod 600 "$TMP/key" || fail KEY_NOT_FOUND "can't read SSH key $KEY"
+        ssh_cmd="$ssh_cmd -i '$TMP/key' -o IdentitiesOnly=yes"
+    elif [ -f "$SCRIPT_DIR/team-key/id_ed25519" ]; then
+        # The shared team key, which robots accept unless they were locked to a team's own key; ssh
+        # also tries the user's own keys (agent, ~/.ssh), so a key added with add-key works too
+        cp "$SCRIPT_DIR/team-key/id_ed25519" "$TMP/key" && chmod 600 "$TMP/key" ||
+            fail KEY_NOT_FOUND "can't read the team key next to $PROG"
+        ssh_cmd="$ssh_cmd -i '$TMP/key'"
+    fi
+    GIT_SSH_COMMAND=$ssh_cmd
+    export GIT_SSH_COMMAND
+    if [ -n "$TRUST_HOSTKEY" ]; then
+        ssh-keygen -R "$HOST" > /dev/null 2>&1
+        say "Forgot the old SSH host key of $HOST; the robot's current key will be trusted"
+    fi
+}
+
+# Uncommitted changes get committed with the user's git identity, or a stand-in when there's none
+# (a robot's own LabVIEW usually has no git identity configured)
+ensure_identity() {
+    if [ -z "$(git config user.name)" ] || [ -z "$(git config user.email)" ]; then
+        user=$(id -un 2> /dev/null || echo labview)
+        host=$(uname -n 2> /dev/null || echo localhost)
+        : "${GIT_AUTHOR_NAME:=$user on $host}" "${GIT_AUTHOR_EMAIL:=$user@$host}"
+        : "${GIT_COMMITTER_NAME:=$GIT_AUTHOR_NAME}" "${GIT_COMMITTER_EMAIL:=$GIT_AUTHOR_EMAIL}"
+        export GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
+    fi
+}
+
+# --- talking to the robot --------------------------------------------------------------------
+
+# Explain a failed ssh/git exchange with the robot, from its error output
+robot_fail() {
+    sed 's/^/  /' "$1"
+    if grep -q "REMOTE HOST IDENTIFICATION HAS CHANGED" "$1"; then
+        fp=$(grep -o 'SHA256:[A-Za-z0-9+/=]*' "$1" | head -n 1)
+        tool "HOSTKEY_CHANGED $HOST $fp"
+        fail HOSTKEY_CHANGED "$HOST has a new SSH host key ($fp), e.g. after an OS reinstall; if that's expected, rerun with --trust-new-hostkey"
+    elif grep -q "Permission denied" "$1"; then
+        fail AUTH_FAILED "$HOST doesn't accept this SSH key; on the robot run: sudo /opt/systemcore-labview/bin/lv-deploy add-key < key.pub"
+    elif grep -qiE "could not resolve|timed out|connection refused|no route to host|network is unreachable" "$1"; then
+        fail UNREACHABLE "can't reach $HOST"
+    elif grep -qiE "does not appear to be a git repository|repository .* not found" "$1"; then
+        fail NO_DEPLOY_REPO "$HOST has no deploy repository; install or update the systemcore-labview package on it"
+    fi
+    fail GIT "git couldn't talk to $HOST"
+}
+
+# The robot's refs/systemcore/* refs ("sha ref" lines) into $TMP/refs
+list_robot_refs() {
+    git ls-remote "$URL" 'refs/systemcore/*' > "$TMP/refs" 2> "$TMP/ls.err" || robot_fail "$TMP/ls.err"
+}
+robot_sha() { awk -v r="$1" '$2 == r { print $1 }' "$TMP/refs"; }
+
+fetch_robot() {
+    git fetch -q --no-tags "$URL" "$@" 2> "$TMP/fetch.err" || robot_fail "$TMP/fetch.err"
+}
+
+# push_deploy PROJECT_COMMIT ADDONS_COMMIT: push what differs from the robot, report the result
+push_deploy() {
+    new_deploy=$1 new_addons=$2
+    old_deploy=$(robot_sha $DEPLOY_REF)
+    old_addons=$(robot_sha $ADDONS_REF)
+    set --
+    if [ "$new_deploy" != "$old_deploy" ]; then
+        set -- "$@" "--force-with-lease=$DEPLOY_REF:$old_deploy" "$new_deploy:$DEPLOY_REF"
+    fi
+    if [ -n "$new_addons" ] && [ "$new_addons" != "$old_addons" ]; then
+        set -- "$@" "--force-with-lease=$ADDONS_REF:$old_addons" "$new_addons:$ADDONS_REF"
+    fi
+    if [ $# -eq 0 ]; then
+        say "The robot already runs this deploy; nothing to do"
+        tool "RESULT UP_TO_DATE"
+        exit 4
+    fi
+    say "Deploying to $HOST..."
+    { git push --atomic "$URL" "$@" 2>&1; echo $? > "$TMP/push.rc"; } > "$TMP/push.out"
+    esc=$(printf '\033')
+    sed -e "s/$esc\[K//g" -e 's/[[:space:]]*$//' "$TMP/push.out" > "$TMP/push.log"
+    sed -n -e '/^remote: SYSTEMCORE: /d' -e 's/^remote: /robot: /p' "$TMP/push.log"
+    deploy_id=$(sed -n 's/^remote: SYSTEMCORE: DEPLOY \([^ ]*\).*/\1/p' "$TMP/push.log" | tail -n 1)
+    result=$(sed -n 's/^remote: SYSTEMCORE: RESULT \([A-Z]*\).*/\1/p' "$TMP/push.log" | tail -n 1)
+    [ -n "$deploy_id" ] && tool "DEPLOY $deploy_id"
+    if grep -q "another deploy finished while this one was being sent" "$TMP/push.log" ||
+        grep -q "stale info" "$TMP/push.log"; then
+        fail CONFLICT "another deploy reached $HOST first; check what it runs now and deploy again"
+    fi
+    case $result in
+        OK) tool "RESULT OK $deploy_id"; exit 0 ;;
+        WARNING) tool "RESULT WARNING $deploy_id"; exit 3 ;;
+        BROKEN) tool "RESULT BROKEN $deploy_id"; exit 2 ;;
+        ERROR) fail REJECTED "$HOST rejected the deploy" ;;
+    esac
+    [ "$(cat "$TMP/push.rc")" = 0 ] || robot_fail "$TMP/push.log"
+    fail GIT "no result from $HOST"
+}
+
+# Commit the add-on directories as one snapshot, each under its own name. The commit's author, date
+# and message are fixed, so the same add-ons always give the same commit and an unchanged snapshot
+# matches the robot's without downloading it.
+snapshot_addons() {
+    git_dir=$(git rev-parse --absolute-git-dir)
+    GIT_INDEX_FILE=$TMP/addons.idx git read-tree --empty || fail GIT "can't build the add-on snapshot"
+    printf '%s' "$ADDONS" > "$TMP/addons.list"
+    : > "$TMP/addons.names"
+    while IFS= read -r dir; do
+        [ -n "$dir" ] || continue
+        [ -d "$dir" ] || fail NO_ADDON "add-on directory not found: $dir"
+        name=$(basename "$dir")
+        if grep -qxF "$name" "$TMP/addons.names"; then
+            fail ADDON_NAME "two add-on directories are named $name"
+        fi
+        printf '%s\n' "$name" >> "$TMP/addons.names"
+        rm -f "$TMP/one.idx"
+        (cd "$dir" && GIT_DIR=$git_dir GIT_WORK_TREE=. GIT_INDEX_FILE=$TMP/one.idx \
+            git -c core.autocrlf=false -c core.safecrlf=false add -A -f . 2> "$TMP/add.err") ||
+            { sed 's/^/  /' "$TMP/add.err"; fail GIT "can't add add-on $dir"; }
+        tree=$(GIT_INDEX_FILE=$TMP/one.idx git write-tree) || fail GIT "can't add add-on $dir"
+        GIT_INDEX_FILE=$TMP/addons.idx git read-tree --prefix="$name/" "$tree" ||
+            fail GIT "can't add add-on $dir"
+        say "Add-on: $name ($dir)"
+    done < "$TMP/addons.list"
+    tree=$(GIT_INDEX_FILE=$TMP/addons.idx git write-tree) || fail GIT "can't build the add-on snapshot"
+    GIT_AUTHOR_NAME="Systemcore add-ons" GIT_AUTHOR_EMAIL=addons@systemcore \
+        GIT_COMMITTER_NAME="Systemcore add-ons" GIT_COMMITTER_EMAIL=addons@systemcore \
+        GIT_AUTHOR_DATE="@1000000000 +0000" GIT_COMMITTER_DATE="@1000000000 +0000" \
+        git commit-tree "$tree" -m "Add-on snapshot" > "$TMP/addons.sha" ||
+        fail GIT "can't build the add-on snapshot"
+}
+
+# --- choosing between this project and the robot's deploy ------------------------------------
+
+# report_commits KEY RANGE: a KEY line for each commit in RANGE, newest first (at most 10)
+report_commits() {
+    n=$(git rev-list --count "$2")
+    git log -n 10 --date=format:'%Y-%m-%d %H:%M' --format="SYSTEMCORE-TOOL: $1 %h %ad %an | %s" "$2"
+    [ "$n" -le 10 ] || tool "$1 ... and $((n - 10)) more"
+}
+
+# merge_check MINE ROBOT: a MERGE_CONFLICT line for each file a merge can't combine (none: it can)
+merge_check() {
+    base=$(git merge-base "$1" "$2" 2> /dev/null) ||
+        { tool "MERGE_CONFLICT all files (the two have no history in common)"; return 0; }
+    out=$(git -c core.quotepath=off merge-tree --write-tree --name-only --no-messages "$1" "$2" 2> /dev/null)
+    case $? in
+        0) return 0 ;;
+        1)
+            printf '%s\n' "$out" | sed 1d | while IFS= read -r f; do
+                [ -z "$f" ] || tool "MERGE_CONFLICT $f"
+            done
+            return 0
+            ;;
+    esac
+    # git before 2.38: files both sides changed differently (LabVIEW files are binary, so these conflict)
+    git -c core.quotepath=off diff --name-only "$base" "$1" > "$TMP/mine.files"
+    git -c core.quotepath=off diff --name-only "$base" "$2" > "$TMP/robot.files"
+    grep -Fx -f "$TMP/robot.files" "$TMP/mine.files" | while IFS= read -r f; do
+        [ "$(git rev-parse -q --verify "$1:$f")" = "$(git rev-parse -q --verify "$2:$f")" ] ||
+            tool "MERGE_CONFLICT $f"
+    done
+}
+
+# report_divergence MINE ROBOT: what each choice loses, for the front end's dialog
+report_divergence() {
+    tool "TARGET $HOST"
+    tool "ROBOT_DEPLOY $(git log -1 --date=iso --format='%h %ad %an | %s' "$2")"
+    report_commits LOCAL_ONLY "$2..$1"
+    report_commits ROBOT_ONLY "$1..$2"
+    merge_check "$1" "$2"
+}
+
+# A commit of the working tree (tracked and new files) on top of HEAD, leaving the index alone
+worktree_commit() {
+    GIT_INDEX_FILE=$TMP/wt.idx git read-tree HEAD &&
+        GIT_INDEX_FILE=$TMP/wt.idx git add -A &&
+        tree=$(GIT_INDEX_FILE=$TMP/wt.idx git write-tree) &&
+        git commit-tree "$tree" -p HEAD -m "Changes not committed yet"
+}
+
+commit_changes() {
+    [ -n "$(git status --porcelain)" ] || return 0
+    git add -A && git commit -q -m "$1" || fail GIT "can't commit the project's changes"
+    tool "COMMITTED $(git rev-parse HEAD)"
+    say "Committed the project's changes: $(git log -1 --format='%h %s')"
+}
+
+# The project's files changed: tell the front end to reload, and the .lvproj to open (none when the
+# new version has no project; the tools are project-centric, so there's no fallback)
+report_open() {
+    tool "RELOAD yes"
+    f=$(ls -- *.lvproj 2> /dev/null | head -n 1)
+    [ -z "$f" ] || tool "OPEN $(native_path "$ROOT/$f")"
+}
+
+# take_robot COMMIT [WHAT [RESULT]]: make this branch COMMIT (WHAT, default the robot's deploy),
+# keeping the old one under a backup ref. RESULT replaces the REPLACED or UPDATED result word.
+take_robot() {
+    word=${3:-}
+    what=${2:-}
+    [ -n "$what" ] || what="the robot's deploy"
+    old=$(git rev-parse HEAD)
+    if ! git merge-base --is-ancestor HEAD "$1" && ! robot_has HEAD; then
+        backup=refs/systemcore-backup/$(date +%Y%m%d-%H%M%S)
+        git update-ref "$backup" HEAD || fail GIT "can't save a backup of this branch"
+        tool "BACKUP $backup"
+    fi
+    git reset -q --hard "$1" || fail GIT "can't switch to $what"
+    report_open
+    say "The project now matches $what: $(git log -1 --format='%h %s')"
+    if [ -n "${backup:-}" ]; then
+        say "The previous version is saved as $backup (see it with: git log $backup)"
+        tool "RESULT ${word:-REPLACED}"
+    elif git merge-base --is-ancestor "$old" HEAD; then
+        say "New in it:"
+        git log --format='  %h %an | %s' "$old..HEAD"
+        tool "RESULT ${word:-UPDATED}"
+    else
+        say "The previous version is in the robot's deploy history"
+        tool "RESULT ${word:-REPLACED}"
+    fi
+}
+
+# robot_has COMMIT: whether a deploy in the robot's history (fetched under $TRACK) contains COMMIT
+robot_has() {
+    for ref in $(git for-each-ref --format='%(refname)' "$TRACK/deploy" "$TRACK/history"); do
+        git merge-base --is-ancestor "$1" "$ref" 2> /dev/null && return 0
+    done
+    return 1
+}
+
+# merge_robot ROBOT: merge the robot's deploy into this branch, or change nothing
+merge_robot() {
+    short=$(git log -1 --format=%h "$1")
+    if ! git merge -q --no-edit -m "Merge the robot's deploy $short" "$1" > "$TMP/merge.out" 2>&1; then
+        git -c core.quotepath=off diff --name-only --diff-filter=U > "$TMP/conflicts"
+        git merge --abort 2> /dev/null || git reset -q --hard HEAD
+        sed 's/^/  /' "$TMP/merge.out"
+        while IFS= read -r f; do tool "MERGE_CONFLICT $f"; done < "$TMP/conflicts"
+        fail MERGE_CONFLICT "can't merge: this project and the robot's deploy changed the same files; keep one of them instead"
+    fi
+    report_open
+    say "Merged the robot's deploy: $(git log -1 --format='%h %s')"
+}
+
+# --- commands --------------------------------------------------------------------------------
+
+cmd_deploy() {
+    find_root
+    require_repo
+    load_target
+    ensure_identity
+    commit_changes "${MESSAGE:-Deploy to $HOST}"
+    head=$(git rev-parse -q --verify HEAD^{commit}) || fail NO_COMMITS "the repository has no commits yet"
+    addons=
+    if [ -n "$ADDONS" ]; then
+        snapshot_addons
+        addons=$(cat "$TMP/addons.sha")
+    fi
+    list_robot_refs
+    robot=$(robot_sha $DEPLOY_REF)
+    if [ -n "$robot" ] && [ "$robot" != "$head" ]; then
+        fetch_robot "+$DEPLOY_REF:$TRACK/deploy"
+        if ! git merge-base --is-ancestor "$robot" "$head"; then
+            info=$(git log -1 --date=iso --format='%h %ad %an | %s' "$robot")
+            say "The robot runs a deploy this project doesn't contain: $info"
+            case $RESOLVE in
+                mine) say "Replacing the robot's deploy" ;;
+                robot)
+                    take_robot "$robot"
+                    exit 0
+                    ;;
+                merge)
+                    merge_robot "$robot"
+                    head=$(git rev-parse HEAD)
+                    ;;
+                *)
+                    report_divergence "$head" "$robot"
+                    say "Choose which to keep: rerun with --resolve robot (take the robot's), --resolve mine (deploy this project anyway) or --resolve merge"
+                    tool "RESULT DIVERGED"
+                    exit 10
+                    ;;
+            esac
+        fi
+    fi
+    push_deploy "$head" "$addons"
+}
+
+cmd_history() {
+    find_root
+    require_repo
+    load_target
+    list_robot_refs
+    [ -n "$(robot_sha $LOG_REF)" ] || { tool "RESULT OK"; exit 0; }
+    fetch_robot "+$LOG_REF:$TRACK/log"
+    git show "$TRACK/log:history.jsonl" > "$TMP/history.jsonl" || fail GIT "can't read the robot's history"
+    cat "$TMP/history.jsonl"
+    # Then one tab-separated "HISTORY id result time author subject in|out" line per version, so the
+    # LabVIEW front end doesn't have to parse JSON (history.jsonl: flat objects, string values)
+    awk '
+        function field(s, k,   i, j, c, out) {
+            i = index(s, "\"" k "\": ")
+            if (!i) return ""
+            i += length(k) + 4
+            if (substr(s, i, 1) != "\"") return ""
+            out = ""
+            for (j = i + 1; j <= length(s); j++) {
+                c = substr(s, j, 1)
+                if (c == "\\") {
+                    j++
+                    c = substr(s, j, 1)
+                    if (c == "t" || c == "n" || c == "r") c = " "
+                } else if (c == "\"") break
+                out = out c
+            }
+            return out
+        }
+        # history.jsonl logs every deploy, oldest first. List each version (project and add-on
+        # commits) once, at its first deploy: a redeploy moves CURRENT back to it rather than adding
+        # a row. The row redeploys through the newest entry of the version, whose refs are pruned last.
+        # Rejected or failed attempts never ran, so each keeps its own row.
+        NF {
+            n++
+            id[n] = field($0, "id"); res[n] = field($0, "result"); tm[n] = field($0, "time")
+            who[n] = field($0, "author"); subj[n] = field($0, "subject"); proj[n] = field($0, "project")
+            if (res[n] == "ok" || res[n] == "warning") {
+                key = field($0, "project") " " field($0, "addons")
+                if (key in first) shown[n] = 0
+                else { first[key] = n; shown[n] = 1 }
+                newest[key] = id[n]; keyof[n] = key; current = key
+            } else shown[n] = 1
+        }
+        END {
+            for (i = 1; i <= n; i++) {
+                if (!shown[i]) continue
+                printf "%s\t%s\t%s\t%s\t%s\t%s\n", (i in keyof) ? newest[keyof[i]] : id[i],
+                       res[i], tm[i], who[i], subj[i], proj[i]
+            }
+            # The deploy the robot runs: its newest accepted one, as lv-deploy counts it
+            if (current != "") printf "CURRENT %s\n", newest[current]
+        }' "$TMP/history.jsonl" > "$TMP/rows"
+    # The last field says whether the robot's running deploy contains the version ("in"), so a
+    # version from a line of work that was replaced can be shown struck through. LOCAL names the
+    # newest version this project's checkout (HEAD) contains: the one it is, or was built on.
+    robot=$(robot_sha $DEPLOY_REF)
+    [ -z "$robot" ] || fetch_robot "+$DEPLOY_REF:$TRACK/deploy" "+$HISTORY_REFS/*/deploy:$TRACK/history/*/deploy"
+    head=$(git rev-parse -q --verify HEAD^{commit}) || head=
+    local_id=
+    tab=$(printf '\t')
+    while IFS= read -r row; do
+        case $row in
+            CURRENT\ *) tool "$row"; continue ;;
+        esac
+        sha=${row##*"$tab"}
+        in=out
+        if [ -n "$sha" ] && [ -n "$robot" ] && git merge-base --is-ancestor "$sha" "$robot" 2> /dev/null; then
+            in=in
+        fi
+        if [ -n "$sha" ] && [ -n "$head" ] && git merge-base --is-ancestor "$sha" "$head" 2> /dev/null; then
+            local_id=${row%%"$tab"*}
+        fi
+        tool "HISTORY ${row%"$tab"*}$tab$in"
+    done < "$TMP/rows"
+    [ -z "$local_id" ] || tool "LOCAL $local_id"
+    tool "RESULT OK"
+}
+
+cmd_info() {
+    find_root
+    tool "ROOT $(native_path "$ROOT")"
+    entry=$(ini_get systemcore.ini project entry)
+    tool "ENTRY ${entry:-Robot Main.vi}"
+    if git rev-parse --git-dir > /dev/null 2>&1 && [ -z "$(git rev-parse --show-prefix)" ]; then
+        tool "REPO yes"
+        if [ -n "$(git status --porcelain)" ]; then tool "CHANGES yes"; else tool "CHANGES no"; fi
+    else
+        tool "REPO no"
+    fi
+    target=${TARGET:-$(ini_get systemcore.local.ini robot target)}
+    target=${target:-$(ini_get systemcore.ini robot target)}
+    [ -n "$target" ] && tool "TARGET $target"
+    tool "RESULT OK"
+}
+
+cmd_redeploy() {
+    check_deploy_id redeploy
+    find_root
+    require_repo
+    load_target
+    list_robot_refs
+    old=$(robot_sha "$HISTORY_REFS/$ARG/deploy")
+    [ -n "$old" ] || fail NO_SUCH_DEPLOY "$HOST has no deploy $ARG in its history (it may have been pruned)"
+    old_addons=$(robot_sha "$HISTORY_REFS/$ARG/addons")
+    # Only objects this repository lacks are downloaded
+    set -- "+$HISTORY_REFS/$ARG/deploy:$TRACK/history/$ARG/deploy"
+    [ -n "$old_addons" ] && set -- "$@" "+$HISTORY_REFS/$ARG/addons:$TRACK/history/$ARG/addons"
+    fetch_robot "$@"
+    say "Redeploying $ARG: $(git log -1 --format='%h %s' "$old")"
+    push_deploy "$old" "$old_addons"
+}
+
+check_deploy_id() {
+    case $ARG in
+        [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]-*) ;;
+        *) fail USAGE "$1 needs a deploy ID (from '$PROG history')" ;;
+    esac
+}
+
+# Make the project an earlier deploy's version to edit from there. Its uncommitted changes are
+# committed first, and the replaced branch is kept under a backup ref unless a deploy in the robot's
+# history contains it. Deploying afterwards takes the usual path: if the robot runs commits this
+# lacks, deploy asks.
+cmd_checkout() {
+    check_deploy_id checkout
+    find_root
+    require_repo
+    load_target
+    ensure_identity
+    list_robot_refs
+    old=$(robot_sha "$HISTORY_REFS/$ARG/deploy")
+    [ -n "$old" ] || fail NO_SUCH_DEPLOY "$HOST has no deploy $ARG in its history (it may have been pruned)"
+    fetch_robot "+$DEPLOY_REF:$TRACK/deploy" "+$HISTORY_REFS/*/deploy:$TRACK/history/*/deploy"
+    git rev-parse -q --verify HEAD^{commit} > /dev/null || fail NO_COMMITS "the repository has no commits yet"
+    msg="Changes before checking out deploy $ARG"
+    commit_changes "${MESSAGE:-$msg}"
+    take_robot "$old" "deploy $ARG" CHECKED_OUT
+}
+
+cmd_fetch() {
+    find_root
+    require_repo
+    load_target
+    ensure_identity
+    [ "$RESOLVE" != mine ] || fail USAGE "fetch takes --resolve robot or --resolve merge"
+    list_robot_refs
+    robot=$(robot_sha $DEPLOY_REF)
+    [ -n "$robot" ] || fail NOTHING_DEPLOYED "$HOST has nothing deployed yet"
+    fetch_robot "+$DEPLOY_REF:$TRACK/deploy" "+$HISTORY_REFS/*/deploy:$TRACK/history/*/deploy"
+    head=$(git rev-parse -q --verify HEAD^{commit}) || fail NO_COMMITS "the repository has no commits yet"
+    tool "FETCHED $robot"
+    say "The robot runs $(git log -1 --format='%h %s' "$robot")"
+    if git merge-base --is-ancestor "$robot" "$head"; then
+        say "The project already has everything the robot runs"
+        tool "RESULT CURRENT"
+        exit 0
+    fi
+    dirty=$(git status --porcelain)
+    if [ -z "$RESOLVE" ] && [ -z "$dirty" ] && git merge-base --is-ancestor "$head" "$robot"; then
+        # Nothing here that the robot lacks. The front end takes it without asking, but first closes
+        # the project so LabVIEW doesn't see its files change under it.
+        report_commits ROBOT_ONLY "$head..$robot"
+        say "The robot has changes this project doesn't, and nothing here would be lost; take them with --resolve robot"
+        tool "RESULT BEHIND"
+        exit 10
+    fi
+    case $RESOLVE in
+        robot)
+            # (an apostrophe inside "${MESSAGE:-...}" starts a quote in some shells)
+            msg="Changes before taking the robot's deploy"
+            commit_changes "${MESSAGE:-$msg}"
+            take_robot "$robot"
+            ;;
+        merge)
+            msg="Changes before merging the robot's deploy"
+            commit_changes "${MESSAGE:-$msg}"
+            merge_robot "$robot"
+            tool "RESULT MERGED"
+            ;;
+        *)
+            mine=$head
+            [ -z "$dirty" ] || mine=$(worktree_commit) || fail GIT "can't read the project's changes"
+            report_divergence "$mine" "$robot"
+            say "This project and the robot's deploy both have changes; rerun with --resolve robot (take the robot's) or --resolve merge"
+            tool "RESULT DIVERGED"
+            exit 10
+            ;;
+    esac
+}
+
+# Add lines a file lacks
+ensure_lines() {
+    file=$1
+    shift
+    for line in "$@"; do
+        grep -qxF "$line" "$file" 2> /dev/null || printf '%s\n' "$line" >> "$file"
+    done
+}
+
+write_project_files() {
+    ensure_lines .gitattributes "*.vi binary" "*.vit binary" "*.ctl binary" "*.ctt binary" \
+        "*.xctl binary" "*.lvclass binary" "*.lvlib binary" "*.lvproj binary" "*.lvsc binary"
+    ensure_lines .gitignore systemcore.local.ini "*.lvlps" "*.aliases" "*.UserState/" "builds/"
+    if [ ! -f systemcore.ini ]; then
+        cat > systemcore.ini << EOF
+[project]
+; Top-level VI, relative to this folder
+entry = Robot Main.vi
+
+[robot]
+; Default deploy target; each developer can override it in systemcore.local.ini
+target = ${TARGET:-robot.local}
+EOF
+    fi
+}
+
+cmd_init() {
+    p=$PROJECT
+    case $p in *.lvproj) p=$(dirname "$p") ;; esac
+    [ -d "$p" ] || fail NO_PROJECT "project folder not found: $p"
+    cd "$p" || fail NO_PROJECT "can't enter $p"
+    ROOT=$(pwd)
+    if ! git rev-parse --git-dir > /dev/null 2>&1; then
+        git init -q && git symbolic-ref HEAD refs/heads/main || fail GIT "git init failed"
+        say "Created a git repository in $ROOT"
+    fi
+    [ -z "$(git rev-parse --show-prefix)" ] ||
+        fail SUBDIRECTORY "the project must be at the top of its git repository ($(git rev-parse --show-toplevel))"
+    write_project_files
+    ensure_identity
+    if [ -n "$(git status --porcelain)" ]; then
+        git add -A && git commit -q -m "${MESSAGE:-Set up the project for Systemcore deploys}" ||
+            fail GIT "can't commit"
+        say "Committed: $(git log -1 --format='%h %s')"
+    fi
+    tool "RESULT OK"
+}
+
+cmd_clone() {
+    [ -n "$ARG" ] || fail USAGE "clone needs a directory"
+    dir=$(normpath "$ARG")
+    if [ -e "$dir" ] && [ -n "$(ls -A "$dir" 2> /dev/null)" ]; then
+        # An earlier copy: say what to open in it, so the front end can still open it
+        if (cd "$dir" && git rev-parse --git-dir > /dev/null 2>&1); then
+            cd "$dir" && ROOT=$(pwd) && report_open
+        fi
+        fail EXISTS "$dir already exists and isn't empty"
+    fi
+    if [ -z "$TARGET" ]; then
+        on_robot || fail NO_TARGET "clone needs the robot's address (--target HOST)"
+        TARGET=localhost
+    fi
+    mkdir -p "$dir" && cd "$dir" || fail EXISTS "can't create $dir"
+    ROOT=$(pwd)
+    git init -q --template= || fail GIT "git init failed"
+    setup_ssh
+    list_robot_refs
+    robot=$(robot_sha $DEPLOY_REF)
+    [ -n "$robot" ] || fail NOTHING_DEPLOYED "$HOST has nothing deployed yet"
+    # Also the project commits of the robot's earlier deploys (not their add-ons), so the copy has
+    # every version the robot ran
+    fetch_robot "+$DEPLOY_REF:$TRACK/deploy" "+$HISTORY_REFS/*/deploy:$TRACK/history/*/deploy"
+    git checkout -q -b robot-edits "$TRACK/deploy" || fail GIT "can't check out the deploy"
+    printf '[robot]\ntarget = %s\n' "$TARGET" > systemcore.local.ini
+    say "Copied the robot's program into $ROOT (branch robot-edits)."
+    say ""
+    say "Commits (* = what the robot runs now):"
+    git log -n 15 --date=format:'%Y-%m-%d %H:%M' --format='%H %h %ad %an | %s' \
+        "$TRACK/deploy" $(git for-each-ref --format='%(refname)' "$TRACK/history") |
+        while read -r full rest; do
+            mark=" "
+            [ "$full" != "$robot" ] || mark="*"
+            say "  $mark $rest"
+            tool "VERSION $mark $rest"
+        done
+    n=$(git rev-list --count "$TRACK/deploy" $(git for-each-ref --format='%(refname)' "$TRACK/history"))
+    [ "$n" -le 15 ] || say "  ... and $((n - 15)) older (git log --all)"
+    ls -- *.lvproj > /dev/null 2>&1 ||
+        say "This version has no LabVIEW project (.lvproj), so there's nothing to open; check out a version that has one."
+    report_open
+    tool "CLONED $(native_path "$ROOT")"
+    tool "RESULT OK"
+}
+
+cmd_env() {
+    if on_robot; then tool "ON_ROBOT yes"; else tool "ON_ROBOT no"; fi
+    tool "RESULT OK"
+}
+
+command -v git > /dev/null 2>&1 || fail NO_GIT "git isn't installed"
+case $CMD in
+    deploy) cmd_deploy ;;
+    history) cmd_history ;;
+    redeploy) cmd_redeploy ;;
+    checkout) cmd_checkout ;;
+    fetch) cmd_fetch ;;
+    init) cmd_init ;;
+    clone) cmd_clone ;;
+    info) cmd_info ;;
+    env) cmd_env ;;
+    -h | --help | help) usage 0 ;;
+    "") usage 2 ;;
+    *) fail USAGE "unknown command $CMD (see $PROG --help)" ;;
+esac

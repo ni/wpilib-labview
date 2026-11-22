@@ -1,0 +1,16 @@
+# Per-machine LabVIEW files
+*.aliases
+*.lvlps
+*.lvprojstate
+*.UserState/
+
+# Native libraries are fetched by scripts/fetch_natives.py, never committed
+lvaddons/*/1/resource/*.so
+lvaddons/*/1/resource/*.so.*
+lvaddons/*/1/resource/*.dll
+lvaddons/*/1/resource/*.dylib
+lvaddons/*/1/resource/notices/
+
+# Build output
+/build/
+__pycache__/
