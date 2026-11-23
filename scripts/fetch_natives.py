@@ -14,6 +14,9 @@ mismatch deletes the download and stops.
         build/deps/<platform>/lib/, for scripts/build-shims.sh.
     python scripts/fetch_natives.py --update-hashes
         After changing versions in natives.json: download everything and record the hashes.
+
+WPILib's own libraries use "version": "wpilib", which is natives.json's wpilibVersion: the WPILib
+release that wpilib-labview tracks (see scripts/version.py).
 """
 
 import argparse
@@ -44,10 +47,15 @@ def classifiers(art):
     return art["platforms"] + art.get("link_platforms", []) + ([HEADERS] if art.get("headers") else [])
 
 
+def artifact_version(manifest, art):
+    """An artifact's version; "wpilib" means the manifest's wpilibVersion, as in vendordep JSON."""
+    return manifest["wpilibVersion"] if art["version"] == "wpilib" else art["version"]
+
+
 def artifact_url(manifest, art, classifier):
     base = manifest["repositories"][art["repository"]].rstrip("/")
     group = art["group"].replace(".", "/")
-    name, version = art["name"], art["version"]
+    name, version = art["name"], artifact_version(manifest, art)
     return f"{base}/{group}/{name}/{version}/{name}-{version}-{classifier}.zip"
 
 
@@ -76,7 +84,7 @@ def download(url, dest):
 
 def cached_zip(manifest, art, classifier):
     return download(artifact_url(manifest, art, classifier),
-                    CACHE / f"{art['name']}-{art['version']}-{classifier}.zip")
+                    CACHE / f"{art['name']}-{artifact_version(manifest, art)}-{classifier}.zip")
 
 
 def verified_zip(manifest, art, classifier):

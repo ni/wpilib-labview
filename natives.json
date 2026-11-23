@@ -1,6 +1,7 @@
 {
+  "wpilibVersion": "2027.0.0-alpha-7",
   "repositories": {
-    "wpilib": "https://frcmaven.wpi.edu/artifactory/development",
+    "wpilib": "https://frcmaven.wpi.edu/artifactory/release",
     "rev": "https://maven.revrobotics.com"
   },
   "platforms": [
@@ -17,7 +18,7 @@
       "repository": "wpilib",
       "group": "org.wpilib.hal",
       "name": "hal-cpp",
-      "version": "2027.0.0-alpha-7",
+      "version": "wpilib",
       "platforms": [
         "linuxsystemcore",
         "windowsx86-64",
@@ -40,7 +41,7 @@
       "repository": "wpilib",
       "group": "org.wpilib.ntcoreffi",
       "name": "ntcoreffi-cpp",
-      "version": "2027.0.0-alpha-7",
+      "version": "wpilib",
       "platforms": [
         "linuxsystemcore",
         "windowsx86-64",
@@ -65,7 +66,7 @@
       "repository": "wpilib",
       "group": "org.wpilib.wpiutil",
       "name": "wpiutil-cpp",
-      "version": "2027.0.0-alpha-7",
+      "version": "wpilib",
       "comment": "Systemcore's image already provides wpiutil",
       "platforms": [
         "windowsx86-64",
@@ -117,7 +118,7 @@
       "repository": "wpilib",
       "group": "org.wpilib.wpimath",
       "name": "wpimath-cpp",
-      "version": "2027.0.0-alpha-7",
+      "version": "wpilib",
       "comment": "Needed by REVLibWpi",
       "platforms": [
         "linuxsystemcore",

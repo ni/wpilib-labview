@@ -36,7 +36,7 @@ See [GitHub's official documentation](https://help.github.com/articles/using-pul
 # Testing
 
 - `scripts/build-in-docker.sh` builds the Linux shim libraries in WPILib's containers and the
-  packages in the same container CI uses (it needs Docker and a POSIX shell, such as Git Bash on
+  archives in the same container CI uses (it needs Docker and a POSIX shell, such as Git Bash on
   Windows). It also runs `scripts/check_repo.py`, which checks the repository rules CI enforces.
 - The shim libraries in `src/` have no automated tests; exercise changes to them on a Systemcore
   robot, and check that each library exports what its `.exports` file lists.

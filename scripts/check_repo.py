@@ -5,6 +5,9 @@
 - Each add-on has a valid lvaddoninfo.json whose AddonName matches its folder.
 - natives.json pins a sha256 for every artifact zip it lists (platforms, link-only platforms, and
   headers), so every download is verified before use.
+- WPILib's own libraries use "version": "wpilib", so wpilibVersion alone sets the WPILib release
+  that a build (and its version, scripts/version.py) tracks.
+- Every platform in natives.json has an archive name in scripts/package.py.
 """
 
 import json
@@ -14,7 +17,12 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "scripts"))
+from package import ASSETS  # noqa: E402
+
 FORBIDDEN = re.compile(r"\.(so|dll|dylib|exe|lib|pdb)$|\.so\.\d|\.(aliases|lvlps|lvprojstate)$|\.UserState/", re.I)
+WPILIB_GROUP = re.compile(r"org\.wpilib\.")
+OWN_VERSIONS = {"org.wpilib.mrclib"}  # WPILib projects versioned apart from the WPILib release
 
 
 def main():
@@ -41,9 +49,16 @@ def main():
                 errors.append(f"{info.relative_to(ROOT)}: missing {key}")
 
     manifest = json.loads((ROOT / "natives.json").read_text(encoding="utf-8"))
+    if not re.fullmatch(r"\d{4}\.\d+\.\d+(-[0-9A-Za-z.-]+)?", manifest.get("wpilibVersion", "")):
+        errors.append(f"natives.json: wpilibVersion {manifest.get('wpilibVersion')!r} isn't a WPILib version")
+    for platform in manifest["platforms"]:
+        if platform not in ASSETS:
+            errors.append(f"natives.json: platform {platform!r} has no archive name in scripts/package.py")
     names = {a.name for a in addons}
     for art in manifest["artifacts"]:
         label = f"natives.json {art['name']}"
+        if WPILIB_GROUP.match(art["group"]) and art["group"] not in OWN_VERSIONS and art["version"] != "wpilib":
+            errors.append(f"{label}: WPILib libraries use \"version\": \"wpilib\" (natives.json's wpilibVersion)")
         if art["addon"] not in names:
             errors.append(f"{label}: add-on {art['addon']!r} doesn't exist")
         if art["repository"] not in manifest["repositories"]:

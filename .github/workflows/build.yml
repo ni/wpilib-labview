@@ -76,24 +76,24 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0    # scripts/version.py counts the commits since the release tag
 
       - uses: actions/download-artifact@v8
         with:
           pattern: shims-*
           path: build/shims
 
+      # Releases track WPILib: a v* tag must be v<wpilibVersion> from natives.json
       - name: Get version
         id: version
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
-          else
-            echo "version=0.0.0-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-          fi
+          version="$(python3 scripts/version.py)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      # Checks the repository and builds every platform's package in the build container
+      # Checks the repository and builds every platform's archive in the build container
       # (docker/Dockerfile), exactly as a local build does, with the shims built above
-      - name: Build packages
+      - name: Build archives
         env:
           VERSION: ${{ steps.version.outputs.version }}
           SHIMS_PREBUILT: 1
@@ -102,20 +102,23 @@ jobs:
 
       # Sign every non-PR build so any build promoted to a release carries its signature. Pull
       # requests from forks can't get the OIDC token signing needs.
-      - name: Attest packages
+      - name: Attest archives
         id: attest
         if: github.event_name != 'pull_request'
         uses: actions/attest@v4
         with:
-          subject-path: build/dist/*.zip
+          subject-path: |
+            build/dist/*.zip
+            build/dist/*.tar.gz
+            build/dist/SHA256SUMS
 
-      - name: Save the attestation next to each package
+      - name: Save the attestation next to each archive
         if: github.event_name != 'pull_request'
         env:
           BUNDLE: ${{ steps.attest.outputs.bundle-path }}
         run: |
-          for zip in build/dist/*.zip; do
-            cp "$BUNDLE" "$zip.sigstore.json"
+          for asset in build/dist/*.zip build/dist/*.tar.gz build/dist/SHA256SUMS; do
+            cp "$BUNDLE" "$asset.sigstore.json"
           done
           ls -l build/dist/
 
@@ -140,9 +143,13 @@ jobs:
       - uses: softprops/action-gh-release@v3
         with:
           files: dist/*
+          prerelease: ${{ contains(github.ref_name, '-') }}   # alpha and beta releases
           body: |
-            Unzip the package for your platform into a LabVIEW add-ons location; see the
+            The LabVIEW add-ons for WPILib ${{ github.ref_name }}. Extract the archive for your
+            platform into a LabVIEW add-ons location; see the
             [README](https://github.com/${{ github.repository }}#installing).
+            `wpilib-labview-systemcore.zip` is for robots, which get it with systemcore-labview.
 
-            Each `.sigstore.json` file is the signed build provenance of the package next to it:
-            `gh attestation verify <package>.zip --repo ${{ github.repository }} --bundle <package>.zip.sigstore.json`
+            `SHA256SUMS` lists every archive's hash. Each `.sigstore.json` file is the signed build
+            provenance of the file next to it:
+            `gh attestation verify <file> --repo ${{ github.repository }} --bundle <file>.sigstore.json`

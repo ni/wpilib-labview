@@ -10,24 +10,40 @@ LabVIEW APIs for WPILib and FRC vendor libraries on Systemcore, as LabVIEW add-o
 
 ## Installing
 
-Each release has one package per platform, `wpilib-labview-<version>-<platform>.zip`. Unzip it
-into a LabVIEW add-ons location, or into any folder listed in `LVAddons.AdditionalLocations` in
-LabVIEW's configuration file, and restart LabVIEW. On Systemcore the add-ons live in
-`~/natinst/lvaddons`.
+The [WPILib installer](https://github.com/wpilibsuite/WPILibInstaller-Avalonia) is meant to
+install these add-ons along with the rest of WPILib, the way it installs AdvantageScope; until it
+does, install them by hand from a release.
 
-| Platform | Package |
+Releases track WPILib: `v2027.0.0-alpha-7` has the add-ons for WPILib 2027.0.0-alpha-7, built
+against its libraries. Alpha and beta releases are marked as prereleases. Each release has one
+archive per platform, with the same names in every release:
+
+| Platform | Archive |
 |---|---|
-| Systemcore | `linuxsystemcore` |
-| Windows | `windowsx86-64`, `windowsarm64` |
-| Linux | `linuxx86-64`, `linuxarm64` |
-| macOS | `osxuniversal` |
+| Windows x64 | `wpilib-labview-win-x64.zip` |
+| Windows arm64 | `wpilib-labview-win-arm64.zip` |
+| Linux x64 | `wpilib-labview-linux-x64.zip` |
+| Linux arm64 | `wpilib-labview-linux-arm64.zip` |
+| macOS (Intel and Apple silicon) | `wpilib-labview-mac-universal.tar.gz` |
+| Systemcore | `wpilib-labview-systemcore.zip`, which robots get with [systemcore-labview](https://github.com/ni/systemcore-labview) |
 
-Each package has a `.sigstore.json` file next to it: its signed build provenance. To check a
-package with the [GitHub CLI](https://cli.github.com/):
+Each archive holds `lvaddons/` (one folder per add-on), the license and third-party notices, and
+`VERSION`. To install one, extract it and either:
+
+- copy the folders in its `lvaddons/` into LabVIEW's add-ons folder (`C:\Program Files\NI\LVAddons`
+  on Windows, `/Library/Application Support/National Instruments/LVAddons/` on macOS,
+  `/usr/local/natinst/share/lvaddons/` on Linux), or
+- add the path of its `lvaddons/` folder to `LVAddons.AdditionalLocations` in LabVIEW's
+  configuration file (LabVIEW 2024 Q1 and later),
+
+then restart LabVIEW.
+
+`SHA256SUMS` lists every archive's hash, and each file has a `.sigstore.json` file next to it: its
+signed build provenance. To check one with the [GitHub CLI](https://cli.github.com/):
 
 ```bash
-gh attestation verify wpilib-labview-<version>-<platform>.zip --repo ni/wpilib-labview \
-  --bundle wpilib-labview-<version>-<platform>.zip.sigstore.json
+gh attestation verify wpilib-labview-win-x64.zip --repo ni/wpilib-labview \
+  --bundle wpilib-labview-win-x64.zip.sigstore.json
 ```
 
 ## Native libraries
@@ -52,17 +68,20 @@ python scripts/fetch_natives.py --platform windowsx86-64
 scripts/build-shims.sh windowsx86-64      # from Git Bash, with Visual Studio 2022 or later
 ```
 
-To move to new WPILib or REV versions, change the versions in `natives.json`, then run
-`python scripts/fetch_natives.py --update-hashes` to record the new hashes.
+To move to a new WPILib release, change `wpilibVersion` in `natives.json` (WPILib's own libraries
+use `"version": "wpilib"`); for REV or MrcLib, change their versions. Then run
+`python scripts/fetch_natives.py --update-hashes` to record the new hashes. A release is tagged
+`v<wpilibVersion>`; CI refuses any other tag ([`scripts/version.py`](scripts/version.py)), and
+builds between releases are versioned `<wpilibVersion>-<commits>-g<hash>`, like WPILib's.
 
 Notes:
 
-- On Systemcore, the robot image already provides `wpiutil` and `MrcLib`, so the
-  `linuxsystemcore` package doesn't include them. (`MrcLib`'s Systemcore build on Maven is only a
+- On Systemcore, the robot image already provides `wpiutil` and `MrcLib`, so
+  `wpilib-labview-systemcore.zip` doesn't include them. (`MrcLib`'s Systemcore build on Maven is only a
   stub to link the shims against.)
 - REVlib's `REVLibWpi` uses the HAL in the wpilib add-on, so the robot program has to initialize
   the HAL (`HAL_Init.vi`) before it calls REVlib VIs.
-- REV doesn't publish Windows arm64 libraries, so the `windowsarm64` package has no REV libraries,
+- REV doesn't publish Windows arm64 libraries, so `wpilib-labview-win-arm64.zip` has no REV libraries,
   and its `FRC_REVLibLV` returns "not implemented" for every call.
 
 ## Not done yet
@@ -71,7 +90,7 @@ Notes:
 - **A Dashboard project template.**
 - **The Swerve subsystem template** is still being brought over.
 - **Differential drive** (Arcade and Tank) VIs for Systemcore motor controllers.
-- **macOS and Linux desktop** packages are built but untested.
+- **macOS and Linux desktop** archives are built but untested.
 
 ## The bootstrap deploy key
 
@@ -90,18 +109,19 @@ container images are pinned by digest:
   [`docker/wpilib-aarch64`](docker/wpilib-aarch64)) with
   [`scripts/docker-shims.sh`](scripts/docker-shims.sh). Windows (Visual Studio 2022 or later) and
   macOS (Xcode) shims build on those systems with [`scripts/build-shims.sh`](scripts/build-shims.sh).
-- The **packages** build in [`docker/Dockerfile`](docker/Dockerfile).
+- The **archives** build in [`docker/Dockerfile`](docker/Dockerfile).
 
 [`scripts/build-in-docker.sh`](scripts/build-in-docker.sh) builds the Linux shims, checks the
-repository rules, and builds the package for every platform into `build/dist/`. Windows and macOS
-packages include their shims only if `scripts/build-shims.sh` has built them:
+repository rules, and builds the archive for every platform, and their `SHA256SUMS`, into
+`build/dist/`. Windows and macOS archives include their shims only if `scripts/build-shims.sh` has
+built them:
 
 ```bash
-scripts/build-in-docker.sh 0.0.0-dev
+scripts/build-in-docker.sh
 ```
 
 [`.github/workflows/build.yml`](.github/workflows/build.yml) builds every platform's shims, then
-runs that script, signs the packages on every build except pull requests, and publishes them as
+runs that script, signs the archives on every build except pull requests, and publishes them as
 a release for `v*` tags.
 
 The shims call LabVIEW's C API, declared by the LabVIEW 2026 Q3 `cintools` headers in
@@ -114,5 +134,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 ## License
 
 BSD-3-Clause; see [LICENSE](LICENSE), except the LabVIEW `cintools` headers in
-[`src/cintools`](src/cintools), which keep NI's notice. The native libraries in the packages come
+[`src/cintools`](src/cintools), which keep NI's notice. The native libraries in the archives come
 with their own licenses; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

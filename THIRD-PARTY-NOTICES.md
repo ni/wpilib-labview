@@ -1,16 +1,16 @@
 # Third-Party Notices
 
 The LabVIEW add-ons in this repository are licensed under the BSD 3-Clause License in
-[LICENSE](LICENSE). The packages built from this repository also contain native libraries from
+[LICENSE](LICENSE). The archives built from this repository also contain native libraries from
 the projects below, downloaded at the versions pinned in [natives.json](natives.json). Each
-package carries the license files that ship with those libraries in
+archive carries the license files that ship with those libraries in
 `lvaddons/<add-on>/1/resource/notices/<artifact>/`.
 
 ## WPILib
 
 `wpiHal`, `ntcoreffi`, `wpiutil`, `wpimath`, and `MrcLib`, from the WPILib Maven repository
 (<https://frcmaven.wpi.edu>); the shim libraries are also built against their headers. WPILib's
-own third-party notices are in `ThirdPartyNotices.txt` next to its license in each package.
+own third-party notices are in `ThirdPartyNotices.txt` next to its license in each archive.
 
 ```text
 Copyright (c) 2009-2026 FIRST and other WPILib contributors
