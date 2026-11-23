@@ -66,7 +66,7 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 
 # A robot has the systemcore-labview package: on the host, or under /host in its LabVIEW container
 on_robot() {
-    [ -x /opt/systemcore-labview/bin/lv-deploy ] || [ -x /host/opt/systemcore-labview/bin/lv-deploy ]
+    [ -x /opt/systemcore-labview/bin/lvdeploy ] || [ -x /host/opt/systemcore-labview/bin/lvdeploy ]
 }
 CMD=${1:-}
 [ $# -gt 0 ] && shift
@@ -224,7 +224,7 @@ robot_fail() {
         tool "HOSTKEY_CHANGED $HOST $fp"
         fail HOSTKEY_CHANGED "$HOST has a new SSH host key ($fp), e.g. after an OS reinstall; if that's expected, rerun with --trust-new-hostkey"
     elif grep -q "Permission denied" "$1"; then
-        fail AUTH_FAILED "$HOST doesn't accept this SSH key; on the robot run: sudo /opt/systemcore-labview/bin/lv-deploy add-key < key.pub"
+        fail AUTH_FAILED "$HOST doesn't accept this SSH key; on the robot run: sudo lvdeploy add-key < key.pub"
     elif grep -qiE "could not resolve|timed out|connection refused|no route to host|network is unreachable" "$1"; then
         fail UNREACHABLE "can't reach $HOST"
     elif grep -qiE "does not appear to be a git repository|repository .* not found" "$1"; then
@@ -553,7 +553,7 @@ cmd_history() {
                 printf "%s\t%s\t%s\t%s\t%s\t%s\n", (i in keyof) ? newest[keyof[i]] : id[i],
                        res[i], tm[i], who[i], subj[i], proj[i]
             }
-            # The deploy the robot runs: its newest accepted one, as lv-deploy counts it
+            # The deploy the robot runs: its newest accepted one, as lvdeploy counts it
             if (current != "") printf "CURRENT %s\n", newest[current]
         }' "$TMP/history.jsonl" > "$TMP/rows"
     # The last field says whether the robot's running deploy contains the version ("in"), so a
