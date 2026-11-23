@@ -21,7 +21,7 @@ jobs:
     name: Shims - ${{ matrix.platform }}
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Build shims
         env:
           PLATFORM: ${{ matrix.platform }}
@@ -40,7 +40,7 @@ jobs:
     name: Shims - ${{ matrix.platform }}
     runs-on: windows-2025
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Build shims
         shell: bash
         env:
@@ -57,7 +57,7 @@ jobs:
     name: Shims - osxuniversal
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Build shims
         run: scripts/build-shims.sh osxuniversal
       - uses: actions/upload-artifact@v7
@@ -75,7 +75,7 @@ jobs:
       attestations: write   # actions/attest: store the attestation
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0    # scripts/version.py counts the commits since the release tag
 
