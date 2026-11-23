@@ -282,6 +282,33 @@ push_deploy() {
     fail GIT "no result from $HOST"
 }
 
+# robot_layout DIR: in the add-on's index ($TMP/one.idx), swap a desktop add-on's libraries for the
+# robot's. A desktop package's add-on carries the Systemcore build of its libraries in
+# <version>/systemcore/, with <version>/systemcore/desktop-files listing the desktop libraries; the
+# robot gets those in place of the desktop ones, which is exactly the add-on as the Systemcore
+# package has it. Add-ons without that folder (on a robot, for example) are left as they are.
+robot_layout() {
+    tab=$(printf '\t')
+    robot_libs=
+    (cd "$1" && GIT_DIR=$git_dir GIT_WORK_TREE=. GIT_INDEX_FILE=$TMP/one.idx \
+        git -c core.quotepath=off ls-files -- '*/systemcore/desktop-files') > "$TMP/robot.lists" || return 1
+    while IFS= read -r list; do
+        [ -n "$list" ] || continue
+        version=${list%/systemcore/desktop-files}
+        libs=$version/systemcore
+        (
+            cd "$1" && export GIT_DIR="$git_dir" GIT_WORK_TREE=. GIT_INDEX_FILE="$TMP/one.idx" &&
+            git -c core.quotepath=off ls-files -s -- "$libs/" | grep -v "$tab$list\$" |
+                sed "s|$tab$libs/|$tab$version/|" > "$TMP/robot.moved" &&
+            tr -d '\r' < "$list" | sed -e '/^$/d' -e "s|^|$version/|" |
+                git update-index --force-remove --stdin &&
+            git -c core.quotepath=off ls-files -- "$libs/" | git update-index --force-remove --stdin &&
+            git update-index --index-info < "$TMP/robot.moved"
+        ) || return 1
+        robot_libs="$robot_libs $version"
+    done < "$TMP/robot.lists"
+}
+
 # Commit the add-on directories as one snapshot, each under its own name. The commit's author, date
 # and message are fixed, so the same add-ons always give the same commit and an unchanged snapshot
 # matches the robot's without downloading it.
@@ -302,10 +329,14 @@ snapshot_addons() {
         (cd "$dir" && GIT_DIR=$git_dir GIT_WORK_TREE=. GIT_INDEX_FILE=$TMP/one.idx \
             git -c core.autocrlf=false -c core.safecrlf=false add -A -f . 2> "$TMP/add.err") ||
             { sed 's/^/  /' "$TMP/add.err"; fail GIT "can't add add-on $dir"; }
+        robot_layout "$dir" || fail GIT "can't put the Systemcore libraries in add-on $dir"
         tree=$(GIT_INDEX_FILE=$TMP/one.idx git write-tree) || fail GIT "can't add add-on $dir"
         GIT_INDEX_FILE=$TMP/addons.idx git read-tree --prefix="$name/" "$tree" ||
             fail GIT "can't add add-on $dir"
         say "Add-on: $name ($dir)"
+        for version in $robot_libs; do
+            say "  version $version: the Systemcore libraries from $version/systemcore"
+        done
     done < "$TMP/addons.list"
     tree=$(GIT_INDEX_FILE=$TMP/addons.idx git write-tree) || fail GIT "can't build the add-on snapshot"
     GIT_AUTHOR_NAME="Systemcore add-ons" GIT_AUTHOR_EMAIL=addons@systemcore \

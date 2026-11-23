@@ -13,10 +13,17 @@ name is in every release, as the WPILib installer expects of the tools it bundle
     osxuniversal     wpilib-labview-mac-universal.tar.gz
     linuxsystemcore  wpilib-labview-systemcore.zip     (installed on robots by systemcore-labview)
 
+The desktop archives also carry the robot's libraries: each add-on version with native libraries
+gets a systemcore/ folder holding the files the Systemcore archive has in their place (libraries
+and notices, at the same paths), and systemcore/desktop-files listing the desktop files they
+replace. When the deploy tool (systemcore-deploy) sends an add-on to a robot, it sends those in
+place of the desktop libraries, so the robot gets the add-on as the Systemcore archive has it.
+
 Archives are reproducible: file modes come from git, and every timestamp is the commit's.
 
-Build archives with scripts/build-in-docker.sh, which runs this in the build container; Linux
-archives need its strip tools.
+Build archives with scripts/build-in-docker.sh, which runs this in the build container; every
+archive needs its strip tools, since every archive has Linux libraries (the desktop ones carry the
+robot's).
 
     python3 scripts/package.py --platform linuxsystemcore --version 2027.0.0-alpha-7
 """
@@ -93,6 +100,48 @@ def add_shims(platform, lvaddons, require):
         print(f"  {lib.relative_to(shims).as_posix()}")
 
 
+def files_under(root):
+    return {p.relative_to(root) for p in root.rglob("*") if p.is_file()} if root.is_dir() else set()
+
+
+def add_natives(platform, lvaddons, require_shims):
+    """Put the platform's libraries, shims and notices in the add-ons; return the files added."""
+    before = files_under(lvaddons)
+    fetch_natives.fetch(fetch_natives.load_manifest(), platform, lvaddons)
+    add_shims(platform, lvaddons, require_shims)
+    if platform.startswith("linux"):
+        strip_debug_info(lvaddons)
+    return files_under(lvaddons) - before
+
+
+ROBOT = "linuxsystemcore"
+ROBOT_LIBS = "systemcore"
+
+
+def add_robot_libraries(lvaddons, desktop_files, require_shims):
+    """Give each add-on version with native libraries a systemcore/ folder: the robot's libraries
+    and notices at the paths the Systemcore archive has them, and desktop-files, the files they
+    replace (see the docstring)."""
+    robot = lvaddons.parent.parent / f"{lvaddons.parent.name}-robot"
+    shutil.rmtree(robot, ignore_errors=True)
+    print(f"  the robot's libraries ({ROBOT}):")
+    robot_files = add_natives(ROBOT, robot, require_shims)
+    replaced = {}
+    for rel in desktop_files | robot_files:
+        replaced.setdefault(Path(*rel.parts[:2]), set())
+    for rel in desktop_files:
+        replaced[Path(*rel.parts[:2])].add(Path(*rel.parts[2:]).as_posix())
+    for rel in robot_files:
+        dest = lvaddons / rel.parts[0] / rel.parts[1] / ROBOT_LIBS / Path(*rel.parts[2:])
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(robot / rel, dest)
+    for version, paths in sorted(replaced.items()):
+        listing = lvaddons / version / ROBOT_LIBS / "desktop-files"
+        listing.parent.mkdir(parents=True, exist_ok=True)
+        listing.write_text("".join(f"{p}\n" for p in sorted(paths)), encoding="utf-8", newline="\n")
+    shutil.rmtree(robot)
+
+
 def write_zip(out, files, mtime):
     stamp = max(mtime, 315532800)  # zip timestamps start in 1980
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
@@ -129,10 +178,9 @@ def main():
         dest = stage / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / rel, dest)
-    fetch_natives.fetch(fetch_natives.load_manifest(), args.platform, stage / "lvaddons")
-    add_shims(args.platform, stage / "lvaddons", args.require_shims)
-    if args.platform.startswith("linux"):
-        strip_debug_info(stage / "lvaddons")
+    desktop_files = add_natives(args.platform, stage / "lvaddons", args.require_shims)
+    if args.platform != ROBOT:
+        add_robot_libraries(stage / "lvaddons", desktop_files, args.require_shims)
     for name in ("LICENSE", "THIRD-PARTY-NOTICES.md"):
         shutil.copy2(ROOT / name, stage / name)
     (stage / "VERSION").write_text(args.version + "\n", encoding="utf-8")

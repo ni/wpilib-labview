@@ -79,6 +79,11 @@ Notes:
 - On Systemcore, the robot image already provides `wpiutil` and `MrcLib`, so
   `wpilib-labview-systemcore.zip` doesn't include them. (`MrcLib`'s Systemcore build on Maven is only a
   stub to link the shims against.)
+- The desktop archives also carry the robot's libraries: the wpilib and REVlib add-ons have a
+  `1/systemcore/` folder with the libraries and notices `wpilib-labview-systemcore.zip` has in their
+  place, and `1/systemcore/desktop-files`, which lists the desktop files they replace. When the
+  deploy tool sends an add-on to a robot, it sends those instead of the desktop libraries, so the
+  robot gets the add-on exactly as `wpilib-labview-systemcore.zip` has it.
 - REVlib's `REVLibWpi` uses the HAL in the wpilib add-on, so the robot program has to initialize
   the HAL (`HAL_Init.vi`) before it calls REVlib VIs.
 - REV doesn't publish Windows arm64 libraries, so `wpilib-labview-win-arm64.zip` has no REV libraries,
