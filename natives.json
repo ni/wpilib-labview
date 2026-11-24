@@ -88,6 +88,72 @@
     {
       "addon": "wpilib",
       "repository": "wpilib",
+      "group": "org.wpilib.ntcore",
+      "name": "ntcore-cpp",
+      "version": "wpilib",
+      "comment": "Needed by wpiHal; Systemcore's image provides it",
+      "platforms": [
+        "windowsx86-64",
+        "windowsarm64",
+        "linuxx86-64",
+        "linuxarm64",
+        "osxuniversal"
+      ],
+      "sha256": {
+        "windowsx86-64": "3281c65553e9dafa85b7e1e590acfa01b44a1e11513f9550f43494a1ebde8117",
+        "windowsarm64": "bf451bd547544fe1a378729dca93f10e6a64ead74651e862ea2ebd24b11ee754",
+        "linuxx86-64": "684b6f0507d439f88f4daf318b928b7900624c57a0ab819cb97b1a791c9222cb",
+        "linuxarm64": "0266ca3ef07672f5ff0a590ca8f13cc3354534859a8d3e558e73e91c41276588",
+        "osxuniversal": "49c307870055518bf337fc3518c1905bac9f95bff05b7918a2616f7797f820e5"
+      }
+    },
+    {
+      "addon": "wpilib",
+      "repository": "wpilib",
+      "group": "org.wpilib.wpinet",
+      "name": "wpinet-cpp",
+      "version": "wpilib",
+      "comment": "Needed by ntcore; Systemcore's image provides it",
+      "platforms": [
+        "windowsx86-64",
+        "windowsarm64",
+        "linuxx86-64",
+        "linuxarm64",
+        "osxuniversal"
+      ],
+      "sha256": {
+        "windowsx86-64": "a4d5baea29b08e3b5b63bd7b8386fea40ffe029b22d27297af45fc06d7804ae0",
+        "windowsarm64": "2183f917010981fc2a72a0e4512cb3cbc2cc205c396a62c29a17c5defbb84f66",
+        "linuxx86-64": "8ce54dcd522b1ea06366333c1e7a4397977a8923ef1b6e0c97f4a05b64604dbe",
+        "linuxarm64": "489e233b6c22480657dca6d1549119524d21b64db9c351b4de18d43c8f9491ed",
+        "osxuniversal": "136ba202fd348b24c091412b56ba39045d676755482c743c0b0c10308819b11b"
+      }
+    },
+    {
+      "addon": "wpilib",
+      "repository": "wpilib",
+      "group": "org.wpilib.datalog",
+      "name": "datalog-cpp",
+      "version": "wpilib",
+      "comment": "Needed by ntcore; Systemcore's image provides it",
+      "platforms": [
+        "windowsx86-64",
+        "windowsarm64",
+        "linuxx86-64",
+        "linuxarm64",
+        "osxuniversal"
+      ],
+      "sha256": {
+        "windowsx86-64": "e29dc225ad1bc146ce702a106d61c73ff0b480db581126d6b03275320fd0476c",
+        "windowsarm64": "8cb222c4da05da8da46d7febc47ed09810ac5c3e57609b7ecfd650d19d4d095f",
+        "linuxx86-64": "6c9dcbd1dded637281f7492d9041a5de13de72b5a7a689e17c014692b1accfee",
+        "linuxarm64": "8596f398572c8e9d699a5018dfd7acb9efeb17322edb8a965c8e565eaedfd144",
+        "osxuniversal": "281c70de2f9b75263eb51afb97f96ce1e64240332a9d72190b85cbbfdc51a5f7"
+      }
+    },
+    {
+      "addon": "wpilib",
+      "repository": "wpilib",
       "group": "org.wpilib.mrclib",
       "name": "mrclib-cpp",
       "version": "2027.1.0-alpha-1-118-g2867aa3",
@@ -133,6 +199,46 @@
         "linuxx86-64": "f7d6b170429be5251e9c144526e5829bcac17ad8d60513c6b85fcc1e5b174dd6",
         "linuxarm64": "8699cd492adb99009a1747dd90415e522309a8e70b29285903eb13928bb42a00",
         "osxuniversal": "e0c5ea0da6ba4899ad1ef5a0472cacab046e826d245eac10b442f76a6669d1d5"
+      }
+    },
+    {
+      "addon": "REVlib",
+      "repository": "wpilib",
+      "group": "org.wpilib.telemetry",
+      "name": "telemetry-cpp",
+      "version": "wpilib",
+      "comment": "Needed by wpimath; Systemcore's image provides it",
+      "platforms": [
+        "windowsx86-64",
+        "linuxx86-64",
+        "linuxarm64",
+        "osxuniversal"
+      ],
+      "sha256": {
+        "windowsx86-64": "c21108601c633dd4f03adf5169e6fbf008de841c69297e3f89f7266b486db923",
+        "linuxx86-64": "3e54c4fae7f70d1ce124d56b8a7e2318be14035d5c0bcc2f039f80ac7c90ed76",
+        "linuxarm64": "697776c8d5f52b3d0ab8dda85da2f2056e668782011f7909984b6736dc1e035e",
+        "osxuniversal": "5691fb08ab859ddc74aa9dd0d8246a00d93267bf13b9fc3b60fe0bfb223b03b2"
+      }
+    },
+    {
+      "addon": "REVlib",
+      "repository": "wpilib",
+      "group": "org.wpilib.tunables",
+      "name": "tunables-cpp",
+      "version": "wpilib",
+      "comment": "Needed by wpimath; Systemcore's image provides it",
+      "platforms": [
+        "windowsx86-64",
+        "linuxx86-64",
+        "linuxarm64",
+        "osxuniversal"
+      ],
+      "sha256": {
+        "windowsx86-64": "d929686aacf96918ed1564d1272aae1039e3caaa93d4ca57f8f02ecb88ef92d2",
+        "linuxx86-64": "4d0b6d6465a83320fc8ee5a77353feb4d3460df2413e48104b175e8594cfdeb3",
+        "linuxarm64": "e5c87d30fab2e13f91a3930c657eb3737b82b36cbcf8db3cdac716d9268e404c",
+        "osxuniversal": "ee848e81781701d8897aba4f8d2c2ba35a8ec99a691c4ca4572729e2352049b2"
       }
     },
     {

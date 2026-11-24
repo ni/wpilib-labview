@@ -76,9 +76,10 @@ builds between releases are versioned `<wpilibVersion>-<commits>-g<hash>`, like 
 
 Notes:
 
-- On Systemcore, the robot image already provides `wpiutil` and `MrcLib`, so
-  `wpilib-labview-systemcore.zip` doesn't include them. (`MrcLib`'s Systemcore build on Maven is only a
-  stub to link the shims against.)
+- On Systemcore, the robot image already provides `wpiutil`, `MrcLib`, and the libraries that `wpiHal`
+  and `wpimath` load (`ntcore`, `wpinet`, `datalog`, `telemetry`, `tunables`), so
+  `wpilib-labview-systemcore.zip` doesn't include them; the desktop archives do. (`MrcLib`'s Systemcore
+  build on Maven is only a stub to link the shims against.)
 - The desktop archives also carry the robot's libraries: the wpilib and REVlib add-ons have a
   `1/systemcore/` folder with the libraries and notices `wpilib-labview-systemcore.zip` has in their
   place, and `1/systemcore/desktop-files`, which lists the desktop files they replace. When the
