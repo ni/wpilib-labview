@@ -25,7 +25,7 @@ Build archives with scripts/build-in-docker.sh, which runs this in the build con
 archive needs its strip tools, since every archive has Linux libraries (the desktop ones carry the
 robot's).
 
-    python3 scripts/package.py --platform linuxsystemcore --version 2027.0.0-alpha-7
+    python3 scripts/package.py --platform linuxsystemcore --version 2027.0.0-alpha-8
 """
 
 import argparse

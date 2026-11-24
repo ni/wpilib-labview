@@ -1,5 +1,5 @@
 {
-  "wpilibVersion": "2027.0.0-alpha-7",
+  "wpilibVersion": "2027.0.0-alpha-8",
   "repositories": {
     "wpilib": "https://frcmaven.wpi.edu/artifactory/release",
     "rev": "https://maven.revrobotics.com"
@@ -28,12 +28,12 @@
         "osxuniversal"
       ],
       "sha256": {
-        "linuxsystemcore": "a012d67cbc9d1590f965d93d0c17a19ae71edb698a285baa932fcf4267aac540",
-        "windowsx86-64": "bfe2f47361ae60ed48f81942539d9450c8ea7390b750f2b64b44950823317a59",
-        "windowsarm64": "6c06ca828d58491313035c70fe5cab88f613e62884de4c37e84eb22d4a9f051d",
-        "linuxx86-64": "bd46c0e2d359d62e4d39111d64c55a9926db2ae7f675f41eaeba6d11d7f54cef",
-        "linuxarm64": "391fe6e26ffe2f76c0accfa6d3f67edff1cfb7de7dd654287029185b55265bc1",
-        "osxuniversal": "9c93acf4da47d1af3fc6d689668d1805849af149dc43c683621dfba55eb40240"
+        "linuxsystemcore": "83212738741975c251e75107990fd123ff4aee488e40bfa3137de0da19869f93",
+        "windowsx86-64": "949d2401f4faed52b74d7e07427f24a0eb9838eead7a156014a0289e5f2fa6b2",
+        "windowsarm64": "e968fb99c5382096c4377ca1a0259197f0e15ae5da26860e8939955e05c148c7",
+        "linuxx86-64": "1c48f6fdde57e895aadc387237d61076d4931ee8ecfd668f599d7668e2bae2a0",
+        "linuxarm64": "30538acdf074cce1670c61b2ac0e41153fc6fd8a10840f9b36888594ff4a0f04",
+        "osxuniversal": "b44dffe1d7818138c9666a22408f5df9e176c19fdfe5d7ade52998cffbf05bc4"
       }
     },
     {
@@ -52,13 +52,13 @@
       ],
       "headers": true,
       "sha256": {
-        "linuxsystemcore": "675db2fa2c7b3147ccdbb36541d70448a354e8173232b3966c4bc8c34461fde5",
-        "windowsx86-64": "6efc3c4bb14d67e88803d8cf3752729185498a066e33752f9f9adb9e0ab625b9",
-        "windowsarm64": "0a0bfeb7847dbdeb95a804d07c89e02a2f7bb34ab93cab5aaa680bdea4b15df1",
-        "linuxx86-64": "6bd18ffdb8d53e338a2a5b238e3ff792ddaac64b77d765c9a12ee98f6eae5d25",
-        "linuxarm64": "9c4105d4dd1fcbd9889c9824b59a40d807d21726be5e09799649ad4df6be5238",
-        "osxuniversal": "f854c3733b7628201c61531ad0afea2ad13e17f1cc1ef06f5989d5293a2c0b12",
-        "headers": "cc189ac71d09ae5c0a41305973c882f867b61b39afa18a41ae1a14cffff4f3c5"
+        "linuxsystemcore": "d0bfdcb8dcc6b2d6c342f34f9987ae3a8ca8111e53e84deb5194335ec778d153",
+        "windowsx86-64": "150ed5f8155c0b8b87fe09e3559dfb19159ecef4d436c7d885abc58481c25eb4",
+        "windowsarm64": "f6c6955b5758afad8f9ed520417439b1a84da6ba7e6663f4f50f33b06143c45b",
+        "linuxx86-64": "659890b455c8bb18fd5799bd27cbd67cc2c1eddae32bfc9eb9c36b37c4eaa11a",
+        "linuxarm64": "60172b99b42195c7bb33712533ca3e03c5f05aa7b1d916fb0e782205eddc7e19",
+        "osxuniversal": "2ebd85479a7e8ace71cc236a2b256608b63044fa031aa4e9e64b16e21a41207a",
+        "headers": "826338e6a862f2030cf3cc1fd3001e5b61c583affde27ee5e5bf153c51a14d1c"
       }
     },
     {
@@ -77,12 +77,12 @@
       ],
       "headers": true,
       "sha256": {
-        "windowsx86-64": "5ffc1037d7615d0d83ed44d2cbea67ba527b9d1642eb14b07f53a2a25e6554cd",
-        "windowsarm64": "7cd7e2d2636864c49aae772dd862159c99e4618035132dd6790c5dda8ce8d695",
-        "linuxx86-64": "706d08f22bd2ddcdae3c5d9b44292707e71753d2639a6f5336a992475a361b52",
-        "linuxarm64": "0316d6c3d6d89c8a0ccd6953e0ddce7342f0cfda23bbe6cb43a81d7d0b5ec9e7",
-        "osxuniversal": "6f786cf70b005389a8c5f171b6c499ec693f19cc6aababc8150c2312fcc9e715",
-        "headers": "d2a90dc91b34f15af97921e058ab52540dd0876400969650ae33783ff314f7b7"
+        "windowsx86-64": "7d4b856bb5a60571b3552c75d10eaeff7fadf9bca71552e02d3f296890e56282",
+        "windowsarm64": "6f4edff5d6e590db569fedd99ed003a4cde761f6e99e54e208451c08d6706841",
+        "linuxx86-64": "61a07c9f8311a677cc540bd0a952ad088b56af06d1c4bed3bb675037bbc1c471",
+        "linuxarm64": "afb9cc1fc04a6ee7cf29a5017bae92d677eae6015b6c68f645bc46942ad450cc",
+        "osxuniversal": "9e97af9e3a6659300429528369456bf1348b2cd9ddb939cf5556dca075b37ff5",
+        "headers": "30b8a860cee7b46992d0239a345260d9e7271f837a76b071e89c7ccf790f0c0f"
       }
     },
     {
@@ -100,11 +100,11 @@
         "osxuniversal"
       ],
       "sha256": {
-        "windowsx86-64": "3281c65553e9dafa85b7e1e590acfa01b44a1e11513f9550f43494a1ebde8117",
-        "windowsarm64": "bf451bd547544fe1a378729dca93f10e6a64ead74651e862ea2ebd24b11ee754",
-        "linuxx86-64": "684b6f0507d439f88f4daf318b928b7900624c57a0ab819cb97b1a791c9222cb",
-        "linuxarm64": "0266ca3ef07672f5ff0a590ca8f13cc3354534859a8d3e558e73e91c41276588",
-        "osxuniversal": "49c307870055518bf337fc3518c1905bac9f95bff05b7918a2616f7797f820e5"
+        "windowsx86-64": "15f6c6c27d141ae85633ffed818dabe82d53ee5c16fd3cee4f42a23145fe097d",
+        "windowsarm64": "5307e7fc14e37872d587341280a6a0af362c533da5d0a60a3158400a60e8f963",
+        "linuxx86-64": "af3ed838b551c65e0b3c0e708824999dfb1dbbaafcc952a7c0245062efe0a5b2",
+        "linuxarm64": "5d539cb04bc53858b21d26aad1ca4ea9f6453e35359bdf9e063f82c05b96b5e8",
+        "osxuniversal": "d76eea7c8760a9f485a0444d341035c2161debcb15c5efe8d9f7bbb905910960"
       }
     },
     {
@@ -122,11 +122,11 @@
         "osxuniversal"
       ],
       "sha256": {
-        "windowsx86-64": "a4d5baea29b08e3b5b63bd7b8386fea40ffe029b22d27297af45fc06d7804ae0",
-        "windowsarm64": "2183f917010981fc2a72a0e4512cb3cbc2cc205c396a62c29a17c5defbb84f66",
-        "linuxx86-64": "8ce54dcd522b1ea06366333c1e7a4397977a8923ef1b6e0c97f4a05b64604dbe",
-        "linuxarm64": "489e233b6c22480657dca6d1549119524d21b64db9c351b4de18d43c8f9491ed",
-        "osxuniversal": "136ba202fd348b24c091412b56ba39045d676755482c743c0b0c10308819b11b"
+        "windowsx86-64": "5b91661afc0dc8470c9842418ff79c90ba19a717ae04fbd301d2ec96e12aa3aa",
+        "windowsarm64": "5666650997595102de70d0d503a655266cf4496bfb74712d1f02af77f787a582",
+        "linuxx86-64": "7a0ca32d89026506eeb7c127fb5609e8e2136a2b524c5d192bea3d0208573205",
+        "linuxarm64": "97cfd3bfda3d0c33ec930c587e765217686e5a3e48fc862edd06c9089d223add",
+        "osxuniversal": "d82ae35c7abc76afc30afe89837b5caa95e66b04e203fb37ae65f5045bc8e326"
       }
     },
     {
@@ -144,11 +144,11 @@
         "osxuniversal"
       ],
       "sha256": {
-        "windowsx86-64": "e29dc225ad1bc146ce702a106d61c73ff0b480db581126d6b03275320fd0476c",
-        "windowsarm64": "8cb222c4da05da8da46d7febc47ed09810ac5c3e57609b7ecfd650d19d4d095f",
-        "linuxx86-64": "6c9dcbd1dded637281f7492d9041a5de13de72b5a7a689e17c014692b1accfee",
-        "linuxarm64": "8596f398572c8e9d699a5018dfd7acb9efeb17322edb8a965c8e565eaedfd144",
-        "osxuniversal": "281c70de2f9b75263eb51afb97f96ce1e64240332a9d72190b85cbbfdc51a5f7"
+        "windowsx86-64": "192f07d3ed9b88deb58f361c34785410a9d07f7530c9998923dd6e6001f76c35",
+        "windowsarm64": "5aac8c07eb60e8a8c6899ff3f69e7251d599c8f314487ec216f0c01ae6deb08c",
+        "linuxx86-64": "96f1bd18b1393f05941975dea9f2cba8b37de50f02416a4049bfdfa09d084057",
+        "linuxarm64": "b5dc7db0e62dacd95953f3cefef8e4443987839ea460fac979126df0e85dcb8f",
+        "osxuniversal": "839b40f59854aa43d9dc827631108b94869b27e3323b195c67867ab5ec7a64b7"
       }
     },
     {
@@ -156,7 +156,7 @@
       "repository": "wpilib",
       "group": "org.wpilib.mrclib",
       "name": "mrclib-cpp",
-      "version": "2027.1.0-alpha-1-118-g2867aa3",
+      "version": "2027.1.0-alpha-1-136-g6c9a137",
       "comment": "Systemcore's image provides MrcLib; its Maven build is a link-only stub",
       "platforms": [
         "windowsx86-64",
@@ -170,13 +170,13 @@
       ],
       "headers": true,
       "sha256": {
-        "windowsx86-64": "737414419c8504b591c48b784abafa14d3fdcc797e3c782cf8d15c2e6b7f937f",
-        "windowsarm64": "ba5578ce2875eaf2f08029b85caadb775453401fb69fb6e83b23d4e325a7c7c1",
-        "linuxx86-64": "5edd36845bbf51bae2dc2dbe0cbce37f11b3990e11ca8d8fd889e83ae89326b0",
-        "linuxarm64": "de65721300dcc7d99a19750647c118ad2cf66936375b12f38e16515d80d0c809",
-        "osxuniversal": "a4f156b7a9d4e1f82f1493e7762233c73c1e25443aa000381f44f25a3a90dae6",
-        "linuxsystemcore": "505b960fed9f66661fc1f52baa10b85ebcf257bdb9f65dac08b9321169b65dc3",
-        "headers": "1020629cbdd8218e9a13f72c1b31b284ee79ecbbc10373d44a938c873783e003"
+        "windowsx86-64": "b0a98e27aa9c57238fbcdd2d407d58b8d7aed51a8204cc4601ad3b2a9b42410c",
+        "windowsarm64": "3f60c5780100e53f01e48d418386fdc38f564ad03b22eeb54f02536bea9e5a6a",
+        "linuxx86-64": "7f7f399d46204e41ba5d10c8a20155d4d0225f5e12e925d2e2be97a325030c54",
+        "linuxarm64": "a438bdc076a96ce460cad6651a643074a1110234b52c363a6525cb955bf720b2",
+        "osxuniversal": "0a4608fa3ddbc795f23fcb31edf71595dc20757f3ae3761ea229474e16ee8006",
+        "linuxsystemcore": "6cce76fe59dae68fbf6b91bc9459562db52cea3a5b03667906d52c90bace9d6c",
+        "headers": "0445aa0051e36e8fe266c1b58f34d17ae756ef1bc6e5d45121e4b01078774a1e"
       }
     },
     {
@@ -194,11 +194,11 @@
         "osxuniversal"
       ],
       "sha256": {
-        "linuxsystemcore": "33cad6b4b57fcb5564a8b5a07f11c1fc445758ad08dd380d11b47fb0ffaec5a8",
-        "windowsx86-64": "5b7637826cd1d393b2e1b8c6dd68e561a6d33541ae82185f0487402a8664200b",
-        "linuxx86-64": "f7d6b170429be5251e9c144526e5829bcac17ad8d60513c6b85fcc1e5b174dd6",
-        "linuxarm64": "8699cd492adb99009a1747dd90415e522309a8e70b29285903eb13928bb42a00",
-        "osxuniversal": "e0c5ea0da6ba4899ad1ef5a0472cacab046e826d245eac10b442f76a6669d1d5"
+        "linuxsystemcore": "67bbc01b67e2a0cf6f3d4d75ea408f84930fb7e63efad1ade3ae06e3e199f016",
+        "windowsx86-64": "88b0ad3c6d35217444dc7c6965a4b594b1f6fc294e393e65f00b62c7829edb86",
+        "linuxx86-64": "17d9872ffe943c2a35d4ac7c044f06f095146225078a7cf011b90cb070174b75",
+        "linuxarm64": "47d5856b191b3a99b95c02400d95c9b909c493ff7efd67a51924e15504b86bc7",
+        "osxuniversal": "cf5eb280fa6db28372b015cbc0e05b12273a84b8a70d47f55e7c82fd2c4df44c"
       }
     },
     {
@@ -215,10 +215,10 @@
         "osxuniversal"
       ],
       "sha256": {
-        "windowsx86-64": "c21108601c633dd4f03adf5169e6fbf008de841c69297e3f89f7266b486db923",
-        "linuxx86-64": "3e54c4fae7f70d1ce124d56b8a7e2318be14035d5c0bcc2f039f80ac7c90ed76",
-        "linuxarm64": "697776c8d5f52b3d0ab8dda85da2f2056e668782011f7909984b6736dc1e035e",
-        "osxuniversal": "5691fb08ab859ddc74aa9dd0d8246a00d93267bf13b9fc3b60fe0bfb223b03b2"
+        "windowsx86-64": "cc7087a413f7fb05e7dd75b7ceeb5f3fef79871e348967c0d4339a5b29ac87be",
+        "linuxx86-64": "b90af09d5367a85b1e2b1b1d59fc6e71f61f41a3636653f08a30cae4b1bcd378",
+        "linuxarm64": "92113b8d8657d31f69540647922868152923b755278095c95b3c537fd4495628",
+        "osxuniversal": "9144d82c5148e6951d762bf96b347b8e198d72fdc2c77f542e1f91a724c73cda"
       }
     },
     {
@@ -235,10 +235,10 @@
         "osxuniversal"
       ],
       "sha256": {
-        "windowsx86-64": "d929686aacf96918ed1564d1272aae1039e3caaa93d4ca57f8f02ecb88ef92d2",
-        "linuxx86-64": "4d0b6d6465a83320fc8ee5a77353feb4d3460df2413e48104b175e8594cfdeb3",
-        "linuxarm64": "e5c87d30fab2e13f91a3930c657eb3737b82b36cbcf8db3cdac716d9268e404c",
-        "osxuniversal": "ee848e81781701d8897aba4f8d2c2ba35a8ec99a691c4ca4572729e2352049b2"
+        "windowsx86-64": "2c1462998be16174b32678b01945d4dd5676e4601974f5fef3bad97422a04691",
+        "linuxx86-64": "b2d2f4936b77a0a7e6a6357ca906a46d4bdccd92c3394f8997e77603546a2174",
+        "linuxarm64": "3e791458d22e2c039cf8ccdad47f01a98e3b5b1cf46345d50890d8c6d4bf6a09",
+        "osxuniversal": "bb0d6420b243d233eaaa92e62f9074446767c8a00c988ee9ad2fbcf35d443eec"
       }
     },
     {
@@ -246,7 +246,7 @@
       "repository": "rev",
       "group": "com.revrobotics.frc",
       "name": "REVLib-driver",
-      "version": "2027.0.0-alpha-8",
+      "version": "2027.0.0-alpha-9",
       "platforms": [
         "linuxsystemcore",
         "windowsx86-64",
@@ -256,12 +256,12 @@
       ],
       "headers": true,
       "sha256": {
-        "linuxsystemcore": "bb002870244a7f93804ef6aac57a6489a23c3c13401ecf463cd474ff81dc7c27",
-        "windowsx86-64": "edc50d1a2d02afd1514374035de3c2b22c053574fbd4a93fa683f10a08c4b294",
-        "linuxx86-64": "8ed51042cf1cf5f765f7e3a81283be6f7ae1d5d5fadcc5f6878a0232f9a37be0",
-        "linuxarm64": "868ab15ed5ef22fbf4e2f0c010449d3792b700ac0937e1bc12530992dc859df7",
-        "osxuniversal": "ee2ce4656c701cac99c4228c0b3f24d9566b3cb3f2db3d5056f5ab65bd7783bc",
-        "headers": "a2b5f82aefccf91639529ac85fb84dd2d3c7ab507bccaf3c02c2c15f4c87f077"
+        "linuxsystemcore": "47e24fbf6edaa3c198dc2a1fa0022fdaba8c1f664f5a31c4f2bb56e62b573c5b",
+        "windowsx86-64": "ae3b1b7fa707873205fc71046d868022fe4da6d8439de4a721dddb8a7e8ee91c",
+        "linuxx86-64": "c7aa5b8ac2dc8e04394e6941fc6e8cc1482af21a232054e7702e3c88c322dd71",
+        "linuxarm64": "9bb82ace1b57094e82f934b14dc3b9df047eb9799345fda7f215239deb9b2c20",
+        "osxuniversal": "0bf0e1802006a0ce5efef0e7907009b3ccc7f6de39e2809999c0db324b897e1b",
+        "headers": "d8f10a36d68721d7f4b11555536ead8e958a9d41d963bd1d9b7d38e056dc4c16"
       }
     },
     {
@@ -269,12 +269,12 @@
       "repository": "rev",
       "group": "com.revrobotics.frc",
       "name": "REVLib-cpp",
-      "version": "2027.0.0-alpha-8",
+      "version": "2027.0.0-alpha-9",
       "comment": "Headers only, for building FRC_REVLibLV",
       "platforms": [],
       "headers": true,
       "sha256": {
-        "headers": "9c3b70e80f6bfc0cb8a22e17ef53e5b3468a627fc3bcadb27900790cb66d595a"
+        "headers": "e58cc4dce1418af88b7b7424f8b9f862482fc873b3de6eed27c4678428d2d081"
       }
     },
     {
@@ -282,7 +282,7 @@
       "repository": "rev",
       "group": "com.revrobotics.frc",
       "name": "RevLibBackendDriver",
-      "version": "2027.0.0-alpha-8",
+      "version": "2027.0.0-alpha-9",
       "platforms": [
         "linuxsystemcore",
         "windowsx86-64",
@@ -292,7 +292,7 @@
       ],
       "sha256": {
         "linuxsystemcore": "7b3468cec37f8b9a85ffb136967859b5c2b09c965be7092c11dca0d6c2df7a73",
-        "windowsx86-64": "24621b923acf232c6119f3528641d6277197d4254c6f080fd45fb07f1406922a",
+        "windowsx86-64": "b8de2d9e66fb1a039515d30bf24c3b89280f7b5af1756ebc512ea94b0d743228",
         "linuxx86-64": "2842b183374846fa57d6837ecf5a6f278a7d65bead7ddc225f954e490099ea1b",
         "linuxarm64": "68dc6f1c7bfd7dbaa57f61e47fd7fa58b896690dbc91d236e9a24c61616aba5f",
         "osxuniversal": "f8f600650cffac6a9d35be915687d94f983ea85724ed3f303a9916087da65211"
@@ -303,7 +303,7 @@
       "repository": "rev",
       "group": "com.revrobotics.frc",
       "name": "RevLibWpiBackendDriver",
-      "version": "2027.0.0-alpha-8",
+      "version": "2027.0.0-alpha-9",
       "platforms": [
         "linuxsystemcore",
         "windowsx86-64",
@@ -312,11 +312,11 @@
         "osxuniversal"
       ],
       "sha256": {
-        "linuxsystemcore": "6b3c08d00081d9b914ac6424f163bd85f7f004fb79a5553d0aaed760ebb3caef",
-        "windowsx86-64": "0c312abd47f230abefcc30f872bc08c392391d3108641398ad07eb3a1adb84d2",
-        "linuxx86-64": "e0076d994241b6f18c795aaa586e707c82eccfa3fa790645156c9061bb01d5ae",
-        "linuxarm64": "cc3a92f10c9e7137432ccccd5833aeb9436cfff83156f48aa652787a8c6a3d61",
-        "osxuniversal": "2607cd4b1cc5af480dde25cabdf18d9ee66926034a213affbf04e805f61a9e42"
+        "linuxsystemcore": "941203cc4473e490bdcec00dbac13ac1fb4aab0037d013ca95af664a5880472f",
+        "windowsx86-64": "3747e9a060e7717864f48e10a2e23e5f35fba0fb06023b53ac28baf5a1ec8778",
+        "linuxx86-64": "895f5ba053baec29555485763d6128c2f9a502ed374d8ba857c5bad8e4689ea4",
+        "linuxarm64": "45e0aa1a322f06e6880d5736f892468b5d83c57535224ff2d95dda6feb2a08f9",
+        "osxuniversal": "7c5c9b4a9847fd42eba3aa48d60f4860cd2661ecb69aab5de7fee09a368ce072"
       }
     }
   ]
