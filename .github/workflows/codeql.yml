@@ -1,0 +1,54 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  schedule:
+    - cron: '23 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: CodeQL - ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read           # CodeQL reads the workflow run
+      security-events: write  # upload the results to code scanning
+    strategy:
+      fail-fast: false
+      matrix:
+        # The shim sources (src/), the build and packaging scripts, and the workflows
+        language: [ c-cpp, python, actions ]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Code scanning stores results only for public repositories (or with GitHub Advanced
+      # Security); while this one is private, analyze without uploading
+      - name: Choose whether to upload
+        id: upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" = true ]; then
+            echo "mode=never" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=always" >> "$GITHUB_OUTPUT"
+          fi
+
+      # build-mode none: the shims need fetched headers and per-platform toolchains to build, and
+      # CodeQL can analyze C and C++ without building them
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
+          upload: ${{ steps.upload.outputs.mode }}

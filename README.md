@@ -128,7 +128,8 @@ scripts/build-in-docker.sh
 
 [`.github/workflows/build.yml`](.github/workflows/build.yml) builds every platform's shims, then
 runs that script, signs the archives on every build except pull requests, and publishes them as
-a release for `v*` tags.
+a release for `v*` tags. [`.github/workflows/codeql.yml`](.github/workflows/codeql.yml) analyzes the
+shim sources, the scripts and the workflows with CodeQL on every push, pull request and week.
 
 The shims call LabVIEW's C API, declared by the LabVIEW 2026 Q3 `cintools` headers in
 [`src/cintools`](src/cintools).
