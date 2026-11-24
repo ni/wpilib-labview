@@ -14,7 +14,7 @@ The [WPILib installer](https://github.com/wpilibsuite/WPILibInstaller-Avalonia) 
 install these add-ons along with the rest of WPILib, the way it installs AdvantageScope; until it
 does, install them by hand from a release.
 
-Releases track WPILib: `v2027.0.0-alpha-7` has the add-ons for WPILib 2027.0.0-alpha-7, built
+Releases track WPILib: `v2027.0.0-alpha-8` has the add-ons for WPILib 2027.0.0-alpha-8, built
 against its libraries. Alpha and beta releases are marked as prereleases. Each release has one
 archive per platform, with the same names in every release:
 
