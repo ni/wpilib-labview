@@ -6,6 +6,10 @@
 #
 #   systemcore-deploy deploy   [options] [--addon DIR]...   commit, snapshot add-ons and deploy
 #   systemcore-deploy history  [options]                    print the robot's deploy history (JSON lines)
+#                                                           of this project (--robot-project ROOT|all)
+#   systemcore-deploy projects [options]                    list the projects on the robot
+#   systemcore-deploy delete-project [options] PROJECT      delete a project (name or start of its root
+#                                                           commit) from the robot, not the one it runs
 #   systemcore-deploy redeploy [options] ID                 deploy an earlier deploy again
 #   systemcore-deploy checkout [options] ID                 make this project an earlier deploy's
 #                                                           version, to edit from there
@@ -32,6 +36,8 @@
 #                           merge  merge the robot's deploy into this project (then deploy it)
 #   --force               the same as --resolve mine
 #   --trust-new-hostkey   accept a changed robot SSH host key (after an OS reinstall)
+#   --robot-project ROOT  the robot project to show (history; "all" for every project) or copy
+#                         (clone); default: this project, else the one the robot runs
 #
 # Exit codes: 0 OK, 1 error, 2 entry VI broken (rejected), 3 deployed with a warning,
 #             4 nothing to deploy, 10 a choice is needed (rerun with --resolve)
@@ -82,15 +88,17 @@ TRUST_HOSTKEY=
 ADDONS=
 ARG=
 SWITCHING=
+ROBOT_PROJECT_ARG=
 while [ $# -gt 0 ]; do
     case $1 in
-        --project | --target | --key | --message | --addon | --resolve)
+        --project | --target | --key | --message | --addon | --resolve | --robot-project)
             [ $# -ge 2 ] || fail USAGE "$1 needs a value"
             case $1 in
                 --project) PROJECT=$(normpath "$2") ;;
                 --target) TARGET=$2 ;;
                 --key) KEY=$(normpath "$2") ;;
                 --message) MESSAGE=$2 ;;
+                --robot-project) ROBOT_PROJECT_ARG=$2 ;;
                 --addon) ADDONS="$ADDONS$(normpath "$2")
 " ;;
                 --resolve)
@@ -165,6 +173,7 @@ require_repo() {
     fi
     [ -z "$(git rev-parse --show-prefix)" ] ||
         fail SUBDIRECTORY "the project must be at the top of its git repository ($(git rev-parse --show-toplevel)), with systemcore.ini there"
+    remember_copy
 }
 
 load_target() {
@@ -248,6 +257,113 @@ robot_sha() { awk -v r="$1" '$2 == r { print $1 }' "$TMP/refs"; }
 
 fetch_robot() {
     git fetch -q --no-tags "$URL" "$@" 2> "$TMP/fetch.err" || robot_fail "$TMP/fetch.err"
+}
+
+# --- the robot's projects ----------------------------------------------------------------------
+
+# awk function reading a field of a flat JSON line (string values, or bare ones such as true)
+JSON_FIELD='
+function field(s, k,   i, j, c, out) {
+    i = index(s, "\"" k "\": ")
+    if (!i) return ""
+    i += length(k) + 4
+    if (substr(s, i, 1) != "\"") { out = substr(s, i); sub(/[,}].*$/, "", out); return out }
+    out = ""
+    for (j = i + 1; j <= length(s); j++) {
+        c = substr(s, j, 1)
+        if (c == "\\") {
+            j++
+            c = substr(s, j, 1)
+            if (c == "t" || c == "n" || c == "r") c = " "
+        } else if (c == "\"") break
+        out = out c
+    }
+    return out
+}'
+
+# load_projects: the projects the robot keeps into $TMP/projects, one "root<TAB>name<TAB>running"
+# line each (running: yes or no), from projects.jsonl in its log. Robots that don't keep projects
+# don't publish it, and the file stays empty.
+load_projects() {
+    : > "$TMP/projects"
+    log=$(robot_sha $LOG_REF)
+    [ -n "$log" ] || return 0
+    [ "$(git rev-parse -q --verify "$TRACK/log" 2> /dev/null)" = "$log" ] || fetch_robot "+$LOG_REF:$TRACK/log"
+    git show "$TRACK/log:projects.jsonl" 2> /dev/null | awk "$JSON_FIELD"'
+        NF { printf "%s\t%s\t%s\n", field($0, "root"), field($0, "name"), (field($0, "running") == "true") ? "yes" : "no" }' \
+        > "$TMP/projects"
+}
+
+# project_root COMMIT: the root commit its first parents lead to, which identifies a project
+project_root() { git rev-list --first-parent --max-parents=0 "$1" 2> /dev/null | head -n 1; }
+
+# Each project's most recently used local copy, per user ("root<TAB>folder" lines), so Deploy History
+# can show where another project's copy is and open it. Every command run in a copy updates it.
+COPIES=
+[ -z "${XDG_CONFIG_HOME:-}${HOME:-}" ] || COPIES=${XDG_CONFIG_HOME:-$HOME/.config}/systemcore-deploy/copies
+remember_copy() {
+    [ -n "$COPIES" ] || return 0
+    r=$(project_root HEAD)
+    [ -n "$r" ] && mkdir -p "$(dirname "$COPIES")" 2> /dev/null || return 0
+    { [ ! -f "$COPIES" ] || awk -F'\t' -v r="$r" '$1 != r' "$COPIES"; printf '%s\t%s\n' "$r" "$ROOT"; } > "$TMP/copies" &&
+        cp "$TMP/copies" "$COPIES" 2> /dev/null
+    return 0
+}
+
+# known_copy ROOT: the folder of ROOT's most recent copy, while it still is one
+known_copy() {
+    [ -n "$COPIES" ] && [ -f "$COPIES" ] || return 0
+    d=$(awk -F'\t' -v r="$1" '$1 == r { print $2; exit }' "$COPIES")
+    [ -n "$d" ] && [ -d "$d" ] || return 0
+    [ "$(git -C "$d" rev-list --first-parent --max-parents=0 HEAD 2> /dev/null | head -n 1)" != "$1" ] ||
+        printf '%s\n' "$d"
+}
+
+# copy_project ROOT: the .lvproj of this computer's copy of project ROOT (this project's own, when
+# $mine is ROOT, else its most recent known copy), if there is one
+mine=
+copy_project() {
+    if [ -n "$mine" ] && [ "$1" = "$mine" ]; then c=$ROOT; else c=$(known_copy "$1"); fi
+    [ -n "$c" ] || return 0
+    f=$(cd "$c" && ls -- *.lvproj 2> /dev/null | head -n 1)
+    [ -z "$f" ] || native_path "$c/$f"
+}
+
+# project_name ROOT: a robot project's name from $TMP/projects (its short root when it has none)
+project_name() {
+    n=$(awk -F'\t' -v r="$1" '$1 == r { print $2; exit }' "$TMP/projects")
+    [ -n "$n" ] || n=$(printf '%.7s' "$1")
+    printf '%s\n' "$n"
+}
+
+running_project() { awk -F'\t' '$3 == "yes" { print $1; exit }' "$TMP/projects"; }
+
+# The robot for commands that don't need a project: --target, the robot itself, or the project's
+robot_target() {
+    if [ -z "$TARGET" ]; then
+        if on_robot; then TARGET=localhost; else find_root; fi
+    fi
+    load_target
+}
+
+# Commands that need no project run git in an empty repository of their own (even git push and
+# fetch need one)
+use_empty_repo() {
+    git init -q --bare "$TMP/empty.git" && cd "$TMP/empty.git" || fail GIT "can't create a temporary repository"
+}
+
+# other_project NAME: the robot runs another project (an unrelated git history). Deploying switches
+# the robot to this one; the other stays on it (Deploy History or lvdeploy switch-project goes back).
+other_project() {
+    case $RESOLVE in
+        mine) say "Switching $HOST from $1 to this project; $1 stays on the robot" ;;
+        *)
+            tool "ROBOT_PROJECT $1"
+            say "$HOST runs another project, $1. Deploying switches it to this one; $1 stays on the robot, and Deploy History can switch back. Rerun with --resolve mine to switch."
+            tool "RESULT OTHER_PROJECT"
+            exit 10
+            ;;
+    esac
 }
 
 # push_deploy PROJECT_COMMIT ADDONS_COMMIT: push what differs from the robot, report the result
@@ -493,8 +609,25 @@ cmd_deploy() {
     list_robot_refs
     robot=$(robot_sha $DEPLOY_REF)
     if [ -n "$robot" ] && [ "$robot" != "$head" ]; then
-        fetch_robot "+$DEPLOY_REF:$TRACK/deploy"
-        if ! git merge-base --is-ancestor "$robot" "$head"; then
+        # Another project on the robot isn't a divergence: deploying switches the robot to this one
+        # (other_project asks first). Robots that publish their projects say which one runs, so its
+        # history needn't be downloaded; for others, unrelated histories mean another project.
+        load_projects
+        running=$(running_project)
+        same=yes
+        if [ -n "$running" ] && [ "$running" != "$(project_root "$head")" ]; then
+            other_project "$(project_name "$running")"
+            same=no
+        fi
+        if [ $same = yes ]; then
+            fetch_robot "+$DEPLOY_REF:$TRACK/deploy"
+            if [ -z "$running" ] && ! git merge-base "$head" "$robot" > /dev/null 2>&1; then
+                name=$(git ls-tree --name-only "$robot" | sed -n 's/\.lvproj$//p' | head -n 1)
+                other_project "${name:-$(git log -1 --format=%h "$robot")}"
+                same=no
+            fi
+        fi
+        if [ $same = yes ] && ! git merge-base --is-ancestor "$robot" "$head"; then
             info=$(git log -1 --date=iso --format='%h %ad %an | %s' "$robot")
             say "The robot runs a deploy this project doesn't contain: $info"
             case $RESOLVE in
@@ -525,12 +658,33 @@ cmd_history() {
     load_target
     list_robot_refs
     [ -n "$(robot_sha $LOG_REF)" ] || { tool "RESULT OK"; exit 0; }
-    fetch_robot "+$LOG_REF:$TRACK/log"
+    load_projects
     git show "$TRACK/log:history.jsonl" > "$TMP/history.jsonl" || fail GIT "can't read the robot's history"
-    cat "$TMP/history.jsonl"
+    head=$(git rev-parse -q --verify HEAD^{commit}) || head=
+    tab=$(printf '\t')
+    # Robots that keep several projects show one project's history: --robot-project's (all: every
+    # project's), else the one the robot runs. PROJECT lines list the robot's projects for the front
+    # end's selector, the shown one first.
+    shown=
+    mine=
+    [ -z "$head" ] || mine=$(project_root "$head")
+    if [ -s "$TMP/projects" ]; then
+        case $ROBOT_PROJECT_ARG in
+            all) ;;
+            "") shown=$(running_project) ;;
+            *)
+                shown=$(awk -F'\t' -v a="$ROBOT_PROJECT_ARG" 'index($1, a) == 1 { print $1; exit }' "$TMP/projects")
+                [ -n "$shown" ] || fail NO_SUCH_PROJECT "$HOST has no project $ROBOT_PROJECT_ARG"
+                ;;
+        esac
+        { awk -F'\t' -v s="$shown" '$1 == s' "$TMP/projects"; awk -F'\t' -v s="$shown" '$1 != s' "$TMP/projects"; } |
+            while IFS="$tab" read -r r n run; do tool "PROJECT $r$tab$n$tab$run$tab$(copy_project "$r")"; done
+        tool "SHOWN ${shown:-all}"
+    fi
+    if [ -n "$shown" ]; then grep -F "\"project_root\": \"$shown\"" "$TMP/history.jsonl"; else cat "$TMP/history.jsonl"; fi
     # Then one tab-separated "HISTORY id result time author subject in|out" line per version, so the
     # LabVIEW front end doesn't have to parse JSON (history.jsonl: flat objects, string values)
-    awk '
+    awk -v shown="$shown" '
         function field(s, k,   i, j, c, out) {
             i = index(s, "\"" k "\": ")
             if (!i) return ""
@@ -551,51 +705,121 @@ cmd_history() {
         # history.jsonl logs every deploy, oldest first. List each version (project and add-on
         # commits) once, at its first deploy: a redeploy moves CURRENT back to it rather than adding
         # a row. The row redeploys through the newest entry of the version, whose refs are pruned last.
-        # Rejected or failed attempts never ran, so each keeps its own row.
+        # Rejected or failed attempts never ran, so each keeps its own row. With a shown project,
+        # only its entries are listed; CURRENT still names what the robot runs.
         NF {
             n++
             id[n] = field($0, "id"); res[n] = field($0, "result"); tm[n] = field($0, "time")
             who[n] = field($0, "author"); subj[n] = field($0, "subject"); proj[n] = field($0, "project")
+            other[n] = shown != "" && field($0, "project_root") != shown
             if (res[n] == "ok" || res[n] == "warning") {
                 key = field($0, "project") " " field($0, "addons")
-                if (key in first) shown[n] = 0
-                else { first[key] = n; shown[n] = 1 }
+                if (key in first) shown_row[n] = 0
+                else { first[key] = n; shown_row[n] = 1 }
                 newest[key] = id[n]; keyof[n] = key; current = key
-            } else shown[n] = 1
+            } else shown_row[n] = 1
         }
         END {
             for (i = 1; i <= n; i++) {
-                if (!shown[i]) continue
+                if (!shown_row[i] || other[i]) continue
                 printf "%s\t%s\t%s\t%s\t%s\t%s\n", (i in keyof) ? newest[keyof[i]] : id[i],
                        res[i], tm[i], who[i], subj[i], proj[i]
             }
             # The deploy the robot runs: its newest accepted one, as lvdeploy counts it
             if (current != "") printf "CURRENT %s\n", newest[current]
         }' "$TMP/history.jsonl" > "$TMP/rows"
-    # The last field says whether the robot's running deploy contains the version ("in"), so a
-    # version from a line of work that was replaced can be shown struck through. LOCAL names the
-    # newest version this project's checkout (HEAD) contains: the one it is, or was built on.
-    robot=$(robot_sha $DEPLOY_REF)
-    [ -z "$robot" ] || fetch_robot "+$DEPLOY_REF:$TRACK/deploy" "+$HISTORY_REFS/*/deploy:$TRACK/history/*/deploy"
-    head=$(git rev-parse -q --verify HEAD^{commit}) || head=
+    # The last field says whether the project's latest deploy (the robot's running one, without a
+    # shown project) contains the version ("in"), so a version from a line of work that was
+    # replaced can be shown struck through. LOCAL names the newest version the project's checkout
+    # (HEAD) contains: the one it is, or was built on. For another project that's its most recent
+    # local copy's checkout, if one is known; COPY names that copy's .lvproj, to open it. Only the
+    # listed versions are fetched.
+    lrepo=.
+    lhead=$head
+    if [ -n "$shown" ] && [ "$shown" != "$mine" ]; then
+        lhead=
+        copy=$(known_copy "$shown")
+        if [ -n "$copy" ]; then
+            lrepo=$copy
+            lhead=$(git -C "$copy" rev-parse -q --verify 'HEAD^{commit}') || lhead=
+        fi
+    fi
+    # COPY: this computer's copy of the shown project (this one's own, else its most recent one)
+    if [ -n "$shown" ]; then
+        f=$(copy_project "$shown")
+        [ -z "$f" ] || tool "COPY $f"
+    fi
+    if [ -n "$shown" ]; then
+        base=$(robot_sha "refs/systemcore/projects/$shown")
+        set -- "+refs/systemcore/projects/$shown:$TRACK/project"
+        for id in $(grep -v '^CURRENT ' "$TMP/rows" | cut -f1); do
+            [ -z "$(robot_sha "$HISTORY_REFS/$id/deploy")" ] || set -- "$@" "+$HISTORY_REFS/$id/deploy:$TRACK/history/$id/deploy"
+        done
+        [ -z "$base" ] || fetch_robot "$@"
+    else
+        base=$(robot_sha $DEPLOY_REF)
+        [ -z "$base" ] || fetch_robot "+$DEPLOY_REF:$TRACK/deploy" "+$HISTORY_REFS/*/deploy:$TRACK/history/*/deploy"
+    fi
     local_id=
-    tab=$(printf '\t')
     while IFS= read -r row; do
         case $row in
             CURRENT\ *) tool "$row"; continue ;;
         esac
         sha=${row##*"$tab"}
         in=out
-        if [ -n "$sha" ] && [ -n "$robot" ] && git merge-base --is-ancestor "$sha" "$robot" 2> /dev/null; then
+        if [ -n "$sha" ] && [ -n "$base" ] && git merge-base --is-ancestor "$sha" "$base" 2> /dev/null; then
             in=in
         fi
-        if [ -n "$sha" ] && [ -n "$head" ] && git merge-base --is-ancestor "$sha" "$head" 2> /dev/null; then
+        if [ -n "$sha" ] && [ -n "$lhead" ] && git -C "$lrepo" merge-base --is-ancestor "$sha" "$lhead" 2> /dev/null; then
             local_id=${row%%"$tab"*}
         fi
         tool "HISTORY ${row%"$tab"*}$tab$in"
     done < "$TMP/rows"
     [ -z "$local_id" ] || tool "LOCAL $local_id"
     tool "RESULT OK"
+}
+
+# The projects the robot keeps, for the front end's selector
+cmd_projects() {
+    robot_target
+    use_empty_repo
+    list_robot_refs
+    load_projects
+    tab=$(printf '\t')
+    # In name order (case-insensitive), as the front end's chooser lists them
+    sort -f -t "$tab" -k2,2 "$TMP/projects" > "$TMP/projects.byname"
+    while IFS="$tab" read -r root name running; do
+        mark=" "
+        [ "$running" != yes ] || mark="*"
+        say "$mark $(printf '%.12s' "$root")  ${name:-(no .lvproj)}"
+        tool "PROJECT $root$tab$name$tab$running$tab$(copy_project "$root")"
+    done < "$TMP/projects.byname"
+    if [ -s "$TMP/projects" ]; then
+        say "(* = the project $HOST runs)"
+    else
+        say "$HOST doesn't list projects: it has nothing deployed, or its systemcore-labview package keeps one project"
+    fi
+    tool "RESULT OK"
+}
+
+# Delete a project (all its deploys) from the robot; not the one it runs
+cmd_delete_project() {
+    [ -n "$ARG" ] || fail USAGE "delete-project needs a project: its name or the start of its root commit"
+    robot_target
+    use_empty_repo
+    list_robot_refs
+    load_projects
+    [ -s "$TMP/projects" ] || fail NO_PROJECTS "$HOST doesn't keep several projects; update its systemcore-labview package"
+    awk -F'\t' -v a="$ARG" 'tolower($2) == tolower(a) || (length(a) >= 4 && index($1, a) == 1)' \
+        "$TMP/projects" > "$TMP/match"
+    n=$(wc -l < "$TMP/match" | tr -d ' ')
+    [ "$n" -gt 0 ] || fail NO_SUCH_PROJECT "$HOST has no project $ARG"
+    [ "$n" -eq 1 ] || fail AMBIGUOUS "$ARG matches $n projects on $HOST; give more of the root commit"
+    IFS=$(printf '\t') read -r root name running < "$TMP/match"
+    [ "$running" != yes ] ||
+        fail RUNNING_PROJECT "$HOST runs ${name:-$root}; deploy or switch to another project before deleting this one"
+    ref=refs/systemcore/projects/$root
+    send_push "Deleting ${name:-$root} from $HOST..." "--force-with-lease=$ref:$(robot_sha "$ref")" ":$ref"
 }
 
 cmd_info() {
@@ -652,8 +876,16 @@ cmd_checkout() {
     list_robot_refs
     old=$(robot_sha "$HISTORY_REFS/$ARG/deploy")
     [ -n "$old" ] || fail NO_SUCH_DEPLOY "$HOST has no deploy $ARG in its history (it may have been pruned)"
-    fetch_robot "+$DEPLOY_REF:$TRACK/deploy" "+$HISTORY_REFS/*/deploy:$TRACK/history/*/deploy"
     git rev-parse -q --verify HEAD^{commit} > /dev/null || fail NO_COMMITS "the repository has no commits yet"
+    load_projects
+    if [ -s "$TMP/projects" ]; then
+        # Robots that keep several projects: only this deploy (another project's isn't a version of this one)
+        fetch_robot "+$HISTORY_REFS/$ARG/deploy:$TRACK/history/$ARG/deploy"
+        [ "$(project_root "$old")" = "$(project_root HEAD)" ] ||
+            fail OTHER_PROJECT "deploy $ARG is from another project ($(project_name "$(project_root "$old")")); copy it with Open Deployed Project"
+    else
+        fetch_robot "+$DEPLOY_REF:$TRACK/deploy" "+$HISTORY_REFS/*/deploy:$TRACK/history/*/deploy"
+    fi
     msg="Changes before checking out deploy $ARG"
     commit_changes "${MESSAGE:-$msg}"
     take_robot "$old" "deploy $ARG" CHECKED_OUT
@@ -668,7 +900,16 @@ cmd_fetch() {
     list_robot_refs
     robot=$(robot_sha $DEPLOY_REF)
     [ -n "$robot" ] || fail NOTHING_DEPLOYED "$HOST has nothing deployed yet"
-    fetch_robot "+$DEPLOY_REF:$TRACK/deploy" "+$HISTORY_REFS/*/deploy:$TRACK/history/*/deploy"
+    load_projects
+    running=$(running_project)
+    if [ -n "$running" ]; then
+        head=$(git rev-parse -q --verify HEAD^{commit}) || fail NO_COMMITS "the repository has no commits yet"
+        [ "$running" = "$(project_root "$head")" ] ||
+            fail OTHER_PROJECT "$HOST runs another project, $(project_name "$running"); Fetch Robot Changes works with the project the robot runs"
+        fetch_robot "+$DEPLOY_REF:$TRACK/deploy"
+    else
+        fetch_robot "+$DEPLOY_REF:$TRACK/deploy" "+$HISTORY_REFS/*/deploy:$TRACK/history/*/deploy"
+    fi
     head=$(git rev-parse -q --verify HEAD^{commit}) || fail NO_COMMITS "the repository has no commits yet"
     tool "FETCHED $robot"
     say "The robot runs $(git log -1 --format='%h %s' "$robot")"
@@ -755,6 +996,7 @@ cmd_init() {
             fail GIT "can't commit"
         say "Committed: $(git log -1 --format='%h %s')"
     fi
+    remember_copy
     tool "RESULT OK"
 }
 
@@ -779,14 +1021,41 @@ cmd_clone() {
     list_robot_refs
     robot=$(robot_sha $DEPLOY_REF)
     [ -n "$robot" ] || fail NOTHING_DEPLOYED "$HOST has nothing deployed yet"
-    # Also the project commits of the robot's earlier deploys (not their add-ons), so the copy has
-    # every version the robot ran
-    fetch_robot "+$DEPLOY_REF:$TRACK/deploy" "+$HISTORY_REFS/*/deploy:$TRACK/history/*/deploy"
+    load_projects
+    if [ -s "$TMP/projects" ]; then
+        # Robots that keep several projects: one project (--robot-project, else the one the robot
+        # runs), with its latest deploy and the project commits of its earlier deploys
+        if [ -n "$ROBOT_PROJECT_ARG" ]; then
+            want=$(awk -F'\t' -v a="$ROBOT_PROJECT_ARG" 'index($1, a) == 1 || tolower($2) == tolower(a) { print $1; exit }' "$TMP/projects")
+        else
+            want=$(running_project)
+        fi
+        [ -n "$want" ] || fail NO_SUCH_PROJECT "$HOST has no project ${ROBOT_PROJECT_ARG:-it runs}"
+        git show "$TRACK/log:history.jsonl" | grep -F "\"project_root\": \"$want\"" |
+            awk "$JSON_FIELD"'{ print field($0, "id") }' > "$TMP/ids"
+        set -- "+refs/systemcore/projects/$want:$TRACK/deploy"
+        while IFS= read -r id; do
+            [ -z "$(robot_sha "$HISTORY_REFS/$id/deploy")" ] || set -- "$@" "+$HISTORY_REFS/$id/deploy:$TRACK/history/$id/deploy"
+        done < "$TMP/ids"
+        fetch_robot "$@"
+        robot=$(git rev-parse "$TRACK/deploy")
+        marks="what the robot runs now"
+        if [ "$want" != "$(running_project)" ]; then
+            say "$HOST runs another project now; this is $(project_name "$want")'s latest deploy."
+            marks="its latest deploy"
+        fi
+    else
+        # Also the project commits of the robot's earlier deploys (not their add-ons), so the copy has
+        # every version the robot ran
+        fetch_robot "+$DEPLOY_REF:$TRACK/deploy" "+$HISTORY_REFS/*/deploy:$TRACK/history/*/deploy"
+        marks="what the robot runs now"
+    fi
     git checkout -q -b robot-edits "$TRACK/deploy" || fail GIT "can't check out the deploy"
+    remember_copy
     printf '[robot]\ntarget = %s\n' "$TARGET" > systemcore.local.ini
     say "Copied the robot's program into $ROOT (branch robot-edits)."
     say ""
-    say "Commits (* = what the robot runs now):"
+    say "Commits (* = $marks):"
     git log -n 15 --date=format:'%Y-%m-%d %H:%M' --format='%H %h %ad %an | %s' \
         "$TRACK/deploy" $(git for-each-ref --format='%(refname)' "$TRACK/history") |
         while read -r full rest; do
@@ -826,7 +1095,7 @@ cmd_use_image_addons() {
         exit 4
     fi
     # git push needs a repository to run in, even to delete a ref; this command has no project
-    git init -q --bare "$TMP/empty.git" && cd "$TMP/empty.git" || fail GIT "can't create a temporary repository"
+    use_empty_repo
     SWITCHING=1
     send_push "Switching the robot to its image's add-ons..." "--force-with-lease=$ADDONS_REF:$old" ":$ADDONS_REF"
 }
@@ -855,6 +1124,8 @@ case $CMD in
     info) cmd_info ;;
     env) cmd_env ;;
     use-image-addons) cmd_use_image_addons ;;
+    projects) cmd_projects ;;
+    delete-project) cmd_delete_project ;;
     -h | --help | help) usage 0 ;;
     "") usage 2 ;;
     *) fail USAGE "unknown command $CMD (see $PROG --help)" ;;
