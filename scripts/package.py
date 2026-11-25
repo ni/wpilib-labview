@@ -19,6 +19,9 @@ and notices, at the same paths), and systemcore/desktop-files listing the deskto
 replace. When the deploy tool (systemcore-deploy) sends an add-on to a robot, it sends those in
 place of the desktop libraries, so the robot gets the add-on as the Systemcore archive has it.
 
+The desktop archives leave out the robot-only files (ROBOT_ONLY: Tools menu entries that only work in
+the robot's own LabVIEW) and their lines in the menu order files.
+
 Archives are reproducible: file modes come from git, and every timestamp is the commit's.
 
 Build archives with scripts/build-in-docker.sh, which runs this in the build container; every
@@ -67,6 +70,24 @@ def commit_time():
 
 
 STRIP_BY_MACHINE = {0x3E: "strip", 0xB7: "aarch64-linux-gnu-strip"}  # ELF e_machine: x86-64, aarch64
+
+# Files only the Systemcore archive gets. LabVIEW lists every VI in an add-on's project folder in its
+# Tools menu, so the only way to keep a robot-only menu entry off desktops is to leave its VI out.
+ROBOT_ONLY = ("lvaddons/systemcore-deploy/1/project/Systemcore/Use the Robot Image's Add-ons.vi",)
+
+
+def drop_robot_only(stage):
+    """Remove the robot-only files from a desktop archive's stage, and their entries from the menu
+    order file (<folder>/<folder>.txt), with a separator the removal would leave at its end."""
+    for rel in ROBOT_ONLY:
+        path = stage / rel
+        path.unlink()
+        menu = path.parent / f"{path.parent.name}.txt"
+        if menu.is_file():
+            lines = [line for line in menu.read_text(encoding="utf-8").splitlines() if line != path.name]
+            while lines and lines[-1] == "-":
+                lines.pop()
+            menu.write_bytes("".join(line + "\n" for line in lines).encode("utf-8"))
 
 
 def strip_debug_info(lvaddons):
@@ -180,6 +201,7 @@ def main():
         shutil.copy2(ROOT / rel, dest)
     desktop_files = add_natives(args.platform, stage / "lvaddons", args.require_shims)
     if args.platform != ROBOT:
+        drop_robot_only(stage)
         add_robot_libraries(stage / "lvaddons", desktop_files, args.require_shims)
     for name in ("LICENSE", "THIRD-PARTY-NOTICES.md"):
         shutil.copy2(ROOT / name, stage / name)
