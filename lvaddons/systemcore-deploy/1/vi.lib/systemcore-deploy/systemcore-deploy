@@ -15,6 +15,9 @@
 #                                                           is needed except on the robot itself)
 #   systemcore-deploy info     [options]                    show the project root, entry VI and target
 #   systemcore-deploy env                                   show whether this runs on a robot
+#   systemcore-deploy use-image-addons                      on a robot: use the robot image's add-ons
+#                                                           instead of the deployed ones (then restart
+#                                                           LabVIEW; the program waits for a deploy)
 #
 # Options:
 #   --project DIR         project folder (or its .lvproj); default: the current directory
@@ -78,6 +81,7 @@ RESOLVE=
 TRUST_HOSTKEY=
 ADDONS=
 ARG=
+SWITCHING=
 while [ $# -gt 0 ]; do
     case $1 in
         --project | --target | --key | --message | --addon | --resolve)
@@ -230,6 +234,9 @@ robot_fail() {
     elif grep -qiE "does not appear to be a git repository|repository .* not found" "$1"; then
         fail NO_DEPLOY_REPO "$HOST has no deploy repository; install or update the systemcore-labview package on it"
     fi
+    # Anything else: git's own message says more than a generic one
+    msg=$(grep -m 1 -E '^(fatal|error): ' "$1" | sed -E 's/^(fatal|error): //')
+    [ -z "$msg" ] || fail GIT "git: $msg"
     fail GIT "git couldn't talk to $HOST"
 }
 
@@ -260,7 +267,14 @@ push_deploy() {
         tool "RESULT UP_TO_DATE"
         exit 4
     fi
-    say "Deploying to $HOST..."
+    send_push "Deploying to $HOST..." "$@"
+}
+
+# send_push MESSAGE REFSPEC...: push to the robot's deploy repository and report what its
+# pre-receive hook said (SYSTEMCORE: DEPLOY/RESULT lines) as the result
+send_push() {
+    say "$1"
+    shift
     { git push --atomic "$URL" "$@" 2>&1; echo $? > "$TMP/push.rc"; } > "$TMP/push.out"
     esc=$(printf '\033')
     sed -e "s/$esc\[K//g" -e 's/[[:space:]]*$//' "$TMP/push.out" > "$TMP/push.log"
@@ -273,7 +287,9 @@ push_deploy() {
         fail CONFLICT "another deploy reached $HOST first; check what it runs now and deploy again"
     fi
     case $result in
-        OK) tool "RESULT OK $deploy_id"; exit 0 ;;
+        OK)
+            [ -z "${SWITCHING:-}" ] || report_switch
+            tool "RESULT OK $deploy_id"; exit 0 ;;
         WARNING) tool "RESULT WARNING $deploy_id"; exit 3 ;;
         BROKEN) tool "RESULT BROKEN $deploy_id"; exit 2 ;;
         ERROR) fail REJECTED "$HOST rejected the deploy" ;;
@@ -793,6 +809,40 @@ cmd_env() {
     tool "RESULT OK"
 }
 
+# Switch the robot to its image's add-ons (docs/DEPLOYMENT.md, "Switching to the robot image's
+# add-ons"): delete refs/systemcore/addons. The robot's pre-receive hook moves the deployed copies of
+# the image's add-ons aside and keeps the robot program stopped until the next deploy. Robot only:
+# afterwards this LabVIEW has to be restarted to load the add-ons.
+cmd_use_image_addons() {
+    on_robot || fail NOT_ON_ROBOT "only the robot's own LabVIEW can switch it to the robot image's add-ons"
+    TARGET=localhost
+    setup_ssh
+    list_robot_refs
+    old=$(robot_sha $ADDONS_REF)
+    if [ -z "$old" ]; then
+        # Nothing deployed, or no deploy since the last switch
+        say "The robot already uses its image's add-ons"
+        tool "RESULT UP_TO_DATE"
+        exit 4
+    fi
+    # git push needs a repository to run in, even to delete a ref; this command has no project
+    git init -q --bare "$TMP/empty.git" && cd "$TMP/empty.git" || fail GIT "can't create a temporary repository"
+    SWITCHING=1
+    send_push "Switching the robot to its image's add-ons..." "--force-with-lease=$ADDONS_REF:$old" ":$ADDONS_REF"
+}
+
+# After a switch the robot said which add-ons it replaced (lvdeploy switch-addons): report them as
+# SWITCHED. When it replaced none, its program kept running, so nothing changed for the user.
+report_switch() {
+    names=$(sed -n "s/^remote: Now using the robot image's \(.*\); the robot program.*/\1/p" "$TMP/push.log" | tail -n 1)
+    if [ -z "$names" ]; then
+        say "The robot already used its image's add-ons; its program runs as before"
+        tool "RESULT UP_TO_DATE"
+        exit 4
+    fi
+    tool "SWITCHED $names"
+}
+
 command -v git > /dev/null 2>&1 || fail NO_GIT "git isn't installed"
 case $CMD in
     deploy) cmd_deploy ;;
@@ -804,6 +854,7 @@ case $CMD in
     clone) cmd_clone ;;
     info) cmd_info ;;
     env) cmd_env ;;
+    use-image-addons) cmd_use_image_addons ;;
     -h | --help | help) usage 0 ;;
     "") usage 2 ;;
     *) fail USAGE "unknown command $CMD (see $PROG --help)" ;;
