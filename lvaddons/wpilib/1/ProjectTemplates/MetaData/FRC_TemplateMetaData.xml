@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="windows-1252" standalone="yes"?>
+<MetaData localize="yes">
+	<ProjectTemplate>
+		<Title localize="yes">FRC Robot Project</Title>
+		<Description localize="yes">Creates an FRC Robot project for programming your Systemcore robot. Opens the FRC Robot Project wizard, which asks for the project name, folder and team number.</Description>
+		<Filters localize="yes">Templates:Desktop</Filters>
+		<Keywords localize="yes">FRC;FIRST;robot;Systemcore;WPILib;wizard</Keywords>
+		<LocationPath>FRC/FRC Robot Project</LocationPath>
+		<ListboxImagePath>frc_robot_project.png</ListboxImagePath>
+		<CustomVIMode>AfterPage1</CustomVIMode>
+		<CustomVIPath>launch_frc_robot_project_wizard.vi</CustomVIPath>
+		<SortPriority>100</SortPriority>
+	</ProjectTemplate>
+</MetaData>
