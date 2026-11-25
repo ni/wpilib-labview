@@ -6,14 +6,59 @@ on:
     tags: [ 'v*' ]
   pull_request:
   workflow_dispatch:
+    inputs:
+      release:
+        description: >-
+          Release this commit of main: tag it v<wpilibVersion>, or v<wpilibVersion>.<n> after an
+          earlier release built against the same WPILib, and publish the archives
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
+  # The version to build, and for a release its tag (scripts/version.py), worked out first so a
+  # release that can't be made fails before anything is built
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      release: ${{ steps.version.outputs.release }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0    # the release tags, and the commits since the last one
+      - name: Get version
+        id: version
+        env:
+          RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.release }}
+        run: |
+          if [ "$RELEASE" = true ]; then
+            if [ "$GITHUB_REF" != refs/heads/main ]; then
+              echo "::error::Releases are made from main, not $GITHUB_REF"
+              exit 1
+            fi
+            tag="$(python3 scripts/version.py --next-tag)"
+            version="$(python3 scripts/version.py --tag "$tag")"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tag="$GITHUB_REF_NAME"
+            version="$(python3 scripts/version.py)"
+          else
+            tag=""
+            version="$(python3 scripts/version.py)"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "release=$([ -n "$tag" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "Version $version${tag:+, released as $tag}" | tee -a "$GITHUB_STEP_SUMMARY"
+
   # The shim libraries (src/), built like WPILib builds its own native code: Linux in WPILib's
   # containers (docker/wpilib-*), Windows and macOS on their runners
   shims-linux:
+    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -33,6 +78,7 @@ jobs:
           if-no-files-found: error
 
   shims-windows:
+    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -54,6 +100,7 @@ jobs:
           if-no-files-found: error
 
   shims-macos:
+    needs: version
     name: Shims - osxuniversal
     runs-on: macos-15
     steps:
@@ -67,7 +114,7 @@ jobs:
           if-no-files-found: error
 
   build:
-    needs: [ shims-linux, shims-windows, shims-macos ]
+    needs: [ version, shims-linux, shims-windows, shims-macos ]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -76,26 +123,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0    # scripts/version.py counts the commits since the release tag
 
       - uses: actions/download-artifact@v8
         with:
           pattern: shims-*
           path: build/shims
 
-      # Releases track WPILib: a v* tag must be v<wpilibVersion> from natives.json
-      - name: Get version
-        id: version
-        run: |
-          version="$(python3 scripts/version.py)"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
       # Checks the repository and builds every platform's archive in the build container
       # (docker/Dockerfile), exactly as a local build does, with the shims built above
       - name: Build archives
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.version.outputs.version }}
           SHIMS_PREBUILT: 1
           REQUIRE_SHIMS: 1
         run: scripts/build-in-docker.sh "$VERSION"
@@ -124,13 +162,13 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: wpilib-labview-${{ steps.version.outputs.version }}
+          name: wpilib-labview-${{ needs.version.outputs.version }}
           path: build/dist/
           retention-days: 90
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    if: needs.version.outputs.release == 'true'
+    needs: [ version, build ]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -140,12 +178,15 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # Creates the tag on this commit when the release came from the Release input
       - uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           files: dist/*
-          prerelease: ${{ contains(github.ref_name, '-') }}   # alpha and beta releases
+          prerelease: ${{ contains(needs.version.outputs.tag, '-') }}   # alpha and beta releases
           body: |
-            The LabVIEW add-ons for WPILib ${{ github.ref_name }}. Extract the archive for your
+            The LabVIEW add-ons for WPILib ${{ needs.version.outputs.tag }}. Extract the archive for your
             platform into a LabVIEW add-ons location; see the
             [README](https://github.com/${{ github.repository }}#installing).
             `wpilib-labview-systemcore.zip` is for robots, which get it with systemcore-labview.

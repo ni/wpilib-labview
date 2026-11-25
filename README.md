@@ -15,7 +15,8 @@ install these add-ons along with the rest of WPILib, the way it installs Advanta
 does, install them by hand from a release.
 
 Releases track WPILib: `v2027.0.0-alpha-8` has the add-ons for WPILib 2027.0.0-alpha-8, built
-against its libraries. Alpha and beta releases are marked as prereleases. Each release has one
+against its libraries, and `v2027.0.0-alpha-8.1`, `.2`, ... are later releases built against the
+same WPILib. Alpha and beta releases are marked as prereleases. Each release has one
 archive per platform, with the same names in every release:
 
 | Platform | Archive |
@@ -70,9 +71,14 @@ scripts/build-shims.sh windowsx86-64      # from Git Bash, with Visual Studio 20
 
 To move to a new WPILib release, change `wpilibVersion` in `natives.json` (WPILib's own libraries
 use `"version": "wpilib"`); for REV or MrcLib, change their versions. Then run
-`python scripts/fetch_natives.py --update-hashes` to record the new hashes. A release is tagged
-`v<wpilibVersion>`; CI refuses any other tag ([`scripts/version.py`](scripts/version.py)), and
-builds between releases are versioned `<wpilibVersion>-<commits>-g<hash>`, like WPILib's.
+`python scripts/fetch_natives.py --update-hashes` to record the new hashes.
+
+To release, run the **Build** workflow on `main` with **Release** checked (Actions » Build » Run
+workflow). It tags the commit `v<wpilibVersion>`, or `v<wpilibVersion>.<n>` if that WPILib version
+has been released before, builds it and publishes the release ([`scripts/version.py`](scripts/version.py)
+picks the tag; CI refuses any other). Merging to `main` doesn't release anything. Builds between
+releases are versioned `<release>-<commits>-g<hash>`, like WPILib's, for example
+`2027.0.0-alpha-8-1-g4de9574`.
 
 Notes:
 
@@ -128,7 +134,7 @@ scripts/build-in-docker.sh
 
 [`.github/workflows/build.yml`](.github/workflows/build.yml) builds every platform's shims, then
 runs that script, signs the archives on every build except pull requests, and publishes them as
-a release for `v*` tags.
+a release when run with **Release** (or for a pushed `v*` tag).
 
 The shims call LabVIEW's C API, declared by the LabVIEW 2026 Q3 `cintools` headers in
 [`src/cintools`](src/cintools).
